@@ -1,31 +1,78 @@
 import {
   Drawer,
+  Toolbar,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Toolbar,
+  Divider,
 } from "@mui/material";
 
 import DashboardIcon from "@mui/icons-material/Dashboard";
+import FolderIcon from "@mui/icons-material/Folder";
 import PeopleIcon from "@mui/icons-material/People";
 import ImageIcon from "@mui/icons-material/Image";
 import DescriptionIcon from "@mui/icons-material/Description";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-const drawerWidth = 240;
+import { Link, useLocation } from "react-router-dom";
+
+const drawerWidth = 250;
 
 function Sidebar() {
+  const location = useLocation();
+
+  const menuItems = [
+    {
+      text: "Dashboard",
+      icon: <DashboardIcon />,
+      path: "/dashboard",
+    },
+    {
+      text: "Study List",
+      icon: <FolderIcon />,
+      path: "/studies",
+    },
+    {
+      text: "Patients",
+      icon: <PeopleIcon />,
+      path: "/patients",
+    },
+    {
+      text: "Image Viewer",
+      icon: <ImageIcon />,
+      path: "/viewer",
+    },
+    {
+      text: "Reports",
+      icon: <DescriptionIcon />,
+      path: "/reports",
+    },
+    {
+      text: "Settings",
+      icon: <SettingsIcon />,
+      path: "/settings",
+    },
+    {
+  text: "Image Viewer",
+  icon: <ImageIcon />,
+  path: "/viewer",
+}
+  ];
+
   return (
     <Drawer
       variant="permanent"
       sx={{
         width: drawerWidth,
         flexShrink: 0,
+
         "& .MuiDrawer-paper": {
           width: drawerWidth,
           boxSizing: "border-box",
+          backgroundColor: "#ffffff",
+          borderRight: "1px solid #e0e0e0",
         },
       }}
     >
@@ -33,49 +80,60 @@ function Sidebar() {
 
       <List>
 
-        <ListItemButton>
-          <ListItemIcon>
-            <DashboardIcon />
-          </ListItemIcon>
-          <ListItemText primary="Dashboard" />
-        </ListItemButton>
+        {menuItems.map((item) => (
 
-        <ListItemButton>
-          <ListItemIcon>
-            <PeopleIcon />
-          </ListItemIcon>
-          <ListItemText primary="Patients" />
-        </ListItemButton>
+          <ListItemButton
+            key={item.text}
+            component={Link}
+            to={item.path}
+            selected={location.pathname === item.path}
+            sx={{
+              mx: 1,
+              my: 0.5,
+              borderRadius: 2,
 
-        <ListItemButton>
-          <ListItemIcon>
-            <ImageIcon />
-          </ListItemIcon>
-          <ListItemText primary="Medical Images" />
-        </ListItemButton>
+              "&.Mui-selected": {
+                backgroundColor: "#1565C0",
+                color: "white",
 
-        <ListItemButton>
-          <ListItemIcon>
-            <DescriptionIcon />
-          </ListItemIcon>
-          <ListItemText primary="Reports" />
-        </ListItemButton>
+                "& .MuiListItemIcon-root": {
+                  color: "white",
+                },
+              },
+            }}
+          >
+            <ListItemIcon>
+              {item.icon}
+            </ListItemIcon>
 
-        <ListItemButton>
-          <ListItemIcon>
-            <SettingsIcon />
-          </ListItemIcon>
-          <ListItemText primary="Settings" />
-        </ListItemButton>
+            <ListItemText primary={item.text} />
 
-        <ListItemButton>
-          <ListItemIcon>
+          </ListItemButton>
+
+        ))}
+
+      </List>
+
+      <Divider sx={{ mt: 2 }} />
+
+      <List>
+
+        <ListItemButton
+          sx={{
+            mx: 1,
+            borderRadius: 2,
+            color: "#d32f2f",
+          }}
+        >
+          <ListItemIcon sx={{ color: "#d32f2f" }}>
             <LogoutIcon />
           </ListItemIcon>
+
           <ListItemText primary="Logout" />
         </ListItemButton>
 
       </List>
+
     </Drawer>
   );
 }
