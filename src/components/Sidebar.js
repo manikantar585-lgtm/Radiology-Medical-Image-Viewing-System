@@ -55,9 +55,9 @@ function Sidebar() {
       path: "/settings",
     },
     {
-  text: "Image Viewer",
-  icon: <ImageIcon />,
-  path: "/viewer",
+  text: "Reports",
+  icon: <DescriptionIcon />,
+  path: "/reports",
 }
   ];
 
@@ -77,11 +77,8 @@ function Sidebar() {
       }}
     >
       <Toolbar />
-
       <List>
-
         {menuItems.map((item) => (
-
           <ListItemButton
             key={item.text}
             component={Link}
@@ -91,11 +88,9 @@ function Sidebar() {
               mx: 1,
               my: 0.5,
               borderRadius: 2,
-
               "&.Mui-selected": {
                 backgroundColor: "#1565C0",
                 color: "white",
-
                 "& .MuiListItemIcon-root": {
                   color: "white",
                 },
@@ -105,19 +100,12 @@ function Sidebar() {
             <ListItemIcon>
               {item.icon}
             </ListItemIcon>
-
             <ListItemText primary={item.text} />
-
           </ListItemButton>
-
         ))}
-
       </List>
-
       <Divider sx={{ mt: 2 }} />
-
       <List>
-
         <ListItemButton
           sx={{
             mx: 1,
@@ -128,12 +116,9 @@ function Sidebar() {
           <ListItemIcon sx={{ color: "#d32f2f" }}>
             <LogoutIcon />
           </ListItemIcon>
-
           <ListItemText primary="Logout" />
         </ListItemButton>
-
       </List>
-
     </Drawer>
   );
 }

@@ -1,3 +1,4 @@
+import Reports from "./pages/Reports";
 import ImageViewer from "./pages/ImageViewer";
 import Patients from "./pages/Patients";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -16,6 +17,7 @@ function App() {
         <Route path="/studies" element={<StudyList />} />
         <Route path="/patients" element={<Patients />} />
         <Route path="/viewer" element={<ImageViewer />} />
+        <Route path="/reports" element={<Reports />} />
       </Routes>
     </BrowserRouter>
   );
