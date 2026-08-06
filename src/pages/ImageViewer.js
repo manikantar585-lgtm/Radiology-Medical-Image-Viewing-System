@@ -1,28 +1,63 @@
+import xray from "../assets/xray.png";
+import { useLocation } from "react-router-dom";
 import Layout from "../components/Layout";
+import { useState, useRef } from "react";
 
 import {
   Box,
-  Typography,
   Paper,
+  Typography,
   Grid,
   Button,
   Divider,
+  Stack,
 } from "@mui/material";
 
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import FullscreenIcon from "@mui/icons-material/Fullscreen";
-
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import DownloadIcon from "@mui/icons-material/Download";
 function ImageViewer() {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [image, setImage] = useState(xray);
+  const fileInputRef = useRef(null);
+  const handleImageUpload = (event) => {
+  const file = event.target.files[0];
+
+  if (file) {
+    const imageURL = URL.createObjectURL(file);
+    setImage(imageURL);
+  }
+};
+  const location = useLocation();
+  const patient = location.state?.patient;
+  const handleZoomIn = () => {
+    setZoom((prev) => prev + 0.2);
+  };
+  const handleZoomOut = () => {
+    if (zoom > 0.4) {
+      setZoom((prev) => prev - 0.2);
+    }
+  };
+  const handleRotate = () => {
+    setRotation((prev) => prev + 90);
+  };
+  const handleReset = () => {
+    setZoom(1);
+    setRotation(0);
+  };
+  const handleDownload = () => {
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = "Chest-Xray.png";
+    link.click();
+  };
   return (
     <Layout>
-      <Typography
-        variant="h4"
-        fontWeight="bold"
-        mb={3}
-      >
+      <Typography variant="h4" fontWeight="bold" mb={3}>
         Medical Image Viewer
       </Typography>
       <Grid container spacing={3}>
@@ -32,213 +67,151 @@ function ImageViewer() {
             elevation={4}
             sx={{
               p: 3,
-              height: "80vh",
+              borderRadius: 3,
+              height: "100%",
             }}
           >
-            <Typography
-              variant="h6"
-              mb={2}
-            >
+            <Typography variant="h6" fontWeight="bold">
               Patient Details
             </Typography>
-            <Divider sx={{ mb: 2 }} />
+            <Divider sx={{ my: 2 }} />
             <Typography>
-              <strong>Patient</strong>
-            </Typography>
-            <Typography mb={2}>
-              Manikanta
+              <strong>Name:</strong> {patient?.name || "No Patient Selected"}
             </Typography>
             <Typography>
-              <strong>MRN</strong>
-            </Typography>
-            <Typography mb={2}>
-              MRN001
+              <strong>MRN:</strong> {patient?.id || "-"}
             </Typography>
             <Typography>
-              <strong>Age</strong>
-            </Typography>
-            <Typography mb={2}>
-              28 Years
+              <strong>Age:</strong> {patient?.age || "-"}
             </Typography>
             <Typography>
-              <strong>Gender</strong>
-            </Typography>
-            <Typography mb={2}>
-              Male
+              <strong>Gender:</strong> {patient?.gender || "-"}
             </Typography>
             <Typography>
-              <strong>Study</strong>
-            </Typography>
-            <Typography mb={2}>
-              CT Chest
-            </Typography>
-            <Typography>
-              <strong>Doctor</strong>
-            </Typography>
-            <Typography mb={2}>
-              Dr. Ramesh
+              <strong>Phone:</strong> {patient?.phone || "-"}
             </Typography>
             <Divider sx={{ my: 3 }} />
-            <Typography
-              variant="h6"
-              mb={2}
-            >
-              Available Studies
+            <Typography variant="h6" fontWeight="bold">
+              Study Information
             </Typography>
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{ mb: 1 }}
-            >
-              CT Chest
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              sx={{ mb: 1 }}
-            >
-              MRI Brain
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              sx={{ mb: 1 }}
-            >
-              X-Ray Hand
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-            >
-              Ultrasound
-            </Button>
+            <Divider sx={{ my: 2 }} />
+            <Typography>
+              <strong>Study ID:</strong> ST001
+            </Typography>
+            <Typography>
+              <strong>Modality:</strong> CT Scan
+            </Typography>
+            <Typography>
+              <strong>Body Part:</strong> Chest
+            </Typography>
+            <Typography>
+              <strong>Date:</strong> 06-Aug-2026
+            </Typography>
+            <Typography>
+              <strong>Status:</strong> Completed
+            </Typography>
           </Paper>
         </Grid>
-        {/* Viewer */}
+
+        {/* Right Panel */}
         <Grid item xs={12} md={9}>
           <Paper
             elevation={4}
             sx={{
-              p: 2,
+              p: 3,
               borderRadius: 3,
             }}
           >
-            <Typography
-              variant="h6"
-              mb={2}
-            >
-              DICOM Viewer
-            </Typography>
             <Box
               sx={{
-                height: "60vh",
-                bgcolor: "#101820",
+                height: 500,
+                bgcolor: "#111",
                 borderRadius: 2,
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                color: "white",
-                flexDirection: "column",
+                overflow: "hidden",
               }}
             >
-              <Typography
-                variant="h4"
-              >
-                Medical Image Viewer
+              <img
+                src={image}
+                alt="Medical Scan"
+                style={{
+                  width: "75%",
+                  maxHeight: "450px",
+                  objectFit: "contain",
+                  transition: "0.3s",
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                }}
+              />
+            </Box>
+            <Box mt={2}>
+              <Typography>
+                <strong>Zoom:</strong> {zoom.toFixed(1)}x
               </Typography>
-              <Typography
-                mt={2}
-                color="#bbbbbb"
-              >
-                CT / MRI / X-Ray Images will appear here.
+              <Typography>
+                <strong>Rotation:</strong> {rotation}°
               </Typography>
             </Box>
-            <Box
-              display="flex"
-              gap={2}
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              onChange={handleImageUpload}
+              />    
+            <Stack
+              direction="row"
+              spacing={2}
+              justifyContent="center"
               mt={3}
               flexWrap="wrap"
             >
-             <Button
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<UploadFileIcon />}
+                onClick={() => fileInputRef.current.click()}
+              >
+                Upload Image
+              </Button>
+              <Button
                 variant="contained"
                 startIcon={<ZoomInIcon />}
+                onClick={handleZoomIn}
               >
                 Zoom In
               </Button>
               <Button
                 variant="contained"
                 startIcon={<ZoomOutIcon />}
+                onClick={handleZoomOut}
               >
                 Zoom Out
               </Button>
-                            <Button
-                variant="contained"
+              <Button
+                variant="outlined"
                 startIcon={<RotateRightIcon />}
+                onClick={handleRotate}
               >
                 Rotate
               </Button>
               <Button
                 variant="outlined"
                 startIcon={<RestartAltIcon />}
+                onClick={handleReset}
               >
                 Reset
               </Button>
               <Button
                 variant="contained"
                 color="success"
-                startIcon={<FullscreenIcon />}
+                startIcon={<DownloadIcon />}
+                onClick={handleDownload}
               >
-                Full Screen
+                Download
               </Button>
-            </Box>
-            <Paper
-              elevation={2}
-              sx={{
-                mt: 4,
-                p: 3,
-                borderRadius: 2,
-              }}
-            >
-              <Typography
-                variant="h6"
-                mb={2}
-              >
-                Image Information
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Modality:</strong> CT
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Status:</strong> Completed
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Resolution:</strong> 512 × 512
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Slices:</strong> 125
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Study Date:</strong> 05-Aug-2026
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography>
-                    <strong>Radiologist:</strong> Dr. Ramesh
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
+            </Stack>
           </Paper>
         </Grid>
       </Grid>

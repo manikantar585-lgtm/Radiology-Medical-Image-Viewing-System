@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import {
   Box,
@@ -20,6 +21,7 @@ import {
   DialogActions,
 } from "@mui/material";
 function Patients() {
+  const navigate = useNavigate();
   const [patients, setPatients] = useState([
     {
       id: 101,
@@ -206,25 +208,40 @@ function Patients() {
                   <TableCell>
                     {patient.phone}
                   </TableCell>
-                  <TableCell align="center">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      sx={{ mr: 1 }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="error"
-                      size="small"
-                      onClick={() =>
-                        handleDelete(patient.id)
-                      }
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
+               <TableCell align="center">
+                <Button
+                variant="contained"
+                size="small"
+    sx={{ mr: 1 }}
+    onClick={() =>
+      navigate("/viewer", {
+        state: {
+          patient,
+        },
+      })
+    }
+  >
+    View
+  </Button>
+
+  <Button
+    variant="outlined"
+    size="small"
+    sx={{ mr: 1 }}
+  >
+    Edit
+  </Button>
+
+  <Button
+    variant="contained"
+    color="error"
+    size="small"
+    onClick={() => handleDelete(patient.id)}
+  >
+    Delete
+  </Button>
+
+</TableCell>
                 </TableRow>
               ))}
                           </TableBody>
