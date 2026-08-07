@@ -1,11 +1,13 @@
-import Reports from "./pages/Reports";
-import ImageViewer from "./pages/ImageViewer";
-import Patients from "./pages/Patients";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import StudyList from "./pages/StudyList";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import StudyList from "./pages/StudyList";
+import Patients from "./pages/Patients";
+import ImageViewer from "./pages/ImageViewer";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -18,6 +20,7 @@ function App() {
         <Route path="/patients" element={<Patients />} />
         <Route path="/viewer" element={<ImageViewer />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   );

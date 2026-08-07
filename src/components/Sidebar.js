@@ -1,3 +1,4 @@
+
 import {
   Drawer,
   Toolbar,
@@ -16,12 +17,24 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-import { Link, useLocation } from "react-router-dom";
+import {
+  Link,useLocation,useNavigate,
+} from "react-router-dom";
 
 const drawerWidth = 250;
 
 function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const handleLogout = () => {
+  const confirmLogout = window.confirm(
+    "Are you sure you want to logout?"
+  );
+
+  if (confirmLogout) {
+    navigate("/");
+  }
+};
 
   const menuItems = [
     {
@@ -54,11 +67,6 @@ function Sidebar() {
       icon: <SettingsIcon />,
       path: "/settings",
     },
-    {
-  text: "Reports",
-  icon: <DescriptionIcon />,
-  path: "/reports",
-}
   ];
 
   return (
@@ -107,12 +115,13 @@ function Sidebar() {
       <Divider sx={{ mt: 2 }} />
       <List>
         <ListItemButton
-          sx={{
-            mx: 1,
-            borderRadius: 2,
-            color: "#d32f2f",
-          }}
-        >
+  onClick={handleLogout}
+  sx={{
+    mx: 1,
+    borderRadius: 2,
+    color: "#d32f2f",
+  }}
+>
           <ListItemIcon sx={{ color: "#d32f2f" }}>
             <LogoutIcon />
           </ListItemIcon>
