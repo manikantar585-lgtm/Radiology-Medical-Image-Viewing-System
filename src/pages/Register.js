@@ -36,11 +36,12 @@ function Register() {
   const [department, setDepartment] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleRegister() {
+  const handleRegister = async () => {
     if (
       !fullName ||
       !email ||
@@ -53,28 +54,55 @@ function Register() {
       alert("Please fill all fields");
       return;
     }
-
     if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
     }
+    if (!agreeTerms) {
+      alert("Please agree to the Terms & Conditions");
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5000/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName,
+          email,
+          mobile,
+          employeeId,
+          department,
+          password,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.message || "Registration failed");
+        return;
+      }
+      alert("Registration Successful");
+      setFullName("");
+      setEmail("");
+      setMobile("");
+      setEmployeeId("");
+      setDepartment("");
+      setPassword("");
+      setConfirmPassword("");
+      setAgreeTerms(false);
 
-    const user = {
-      fullName,
-      email,
-      mobile,
-      employeeId,
-      department,
-      password,
-    };
-
-    localStorage.setItem("user", JSON.stringify(user));
-
-    alert("Registration Successful");
-
-    navigate("/");
-  }
-
+      navigate("/");
+    } catch (error) {
+      console.error("Registration Error:", error);
+      alert(
+        "Cannot connect to backend server. Please make sure the server is running."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <Container
       maxWidth="sm"
@@ -82,10 +110,17 @@ function Register() {
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
+        py: 3,
       }}
     >
-      <Paper elevation={8} sx={{ p: 5, width: "100%", borderRadius: 4 }}>
-
+      <Paper
+        elevation={8}
+        sx={{
+          p: 5,
+          width: "100%",
+          borderRadius: 4,
+        }}
+      >
         <Typography
           variant="h4"
           align="center"
@@ -94,7 +129,6 @@ function Register() {
         >
           Create Account
         </Typography>
-
         <Typography
           align="center"
           color="text.secondary"
@@ -102,7 +136,6 @@ function Register() {
         >
           Radiology Medical Image Viewing System
         </Typography>
-
         <TextField
           fullWidth
           margin="normal"
@@ -117,11 +150,11 @@ function Register() {
             ),
           }}
         />
-
         <TextField
           fullWidth
           margin="normal"
           label="Email Address"
+          type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           InputProps={{
@@ -132,7 +165,6 @@ function Register() {
             ),
           }}
         />
-
         <TextField
           fullWidth
           margin="normal"
@@ -147,7 +179,6 @@ function Register() {
             ),
           }}
         />
-
         <TextField
           fullWidth
           margin="normal"
@@ -162,7 +193,6 @@ function Register() {
             ),
           }}
         />
-
         <TextField
           fullWidth
           select
@@ -183,7 +213,6 @@ function Register() {
           <MenuItem value="Neurology">Neurology</MenuItem>
           <MenuItem value="Orthopedics">Orthopedics</MenuItem>
         </TextField>
-
         <TextField
           fullWidth
           margin="normal"
@@ -199,14 +228,15 @@ function Register() {
             ),
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => setShowPassword(!showPassword)}>
+                <IconButton
+                  onClick={() => setShowPassword(!showPassword)}
+                >
                   {showPassword ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
               </InputAdornment>
             ),
           }}
         />
-
         <TextField
           fullWidth
           margin="normal"
@@ -237,31 +267,32 @@ function Register() {
             ),
           }}
         />
-
         <FormControlLabel
-          control={<Checkbox />}
+          control={
+            <Checkbox
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+            />
+          }
           label="I agree to the Terms & Conditions"
           sx={{ mt: 1 }}
         />
-
         <Button
           fullWidth
           variant="contained"
           size="large"
           sx={{ mt: 2 }}
           onClick={handleRegister}
+          disabled={loading}
         >
-          Create Account
+          {loading ? "Creating Account..." : "Create Account"}
         </Button>
-
         <Box textAlign="center" mt={3}>
           Already have an account?{" "}
           <Link to="/">Login</Link>
         </Box>
-
       </Paper>
     </Container>
   );
 }
-
 export default Register;

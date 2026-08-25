@@ -7,49 +7,110 @@ import {
   Avatar,
   Badge,
 } from "@mui/material";
+
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 function Navbar() {
+  let loggedInUser = null;
+  try {
+    const storedUser =
+      localStorage.getItem(
+        "loggedInUser"
+      );
+    if (storedUser) {
+      loggedInUser =
+        JSON.parse(storedUser);
+    }
+  } catch (error) {
+    console.error(
+      "Unable to read logged-in user:",
+      error
+    );
+  }
+  const userName =
+    loggedInUser?.fullName ||
+    "Admin";
+  const department =
+    loggedInUser?.department ||
+    "Radiologist";
+  const getInitials = (
+    name
+  ) => {
+    if (!name) {
+      return "A";
+    }
+    const words =
+      name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    if (
+      words.length === 1
+    ) {
+      return words[0]
+        .charAt(0)
+        .toUpperCase();
+    }
+    return (
+      words[0]
+        .charAt(0)
+        .toUpperCase() +
+      words[
+        words.length - 1
+      ]
+        .charAt(0)
+        .toUpperCase()
+    );
+  };
   return (
     <AppBar
       position="fixed"
       elevation={2}
+      color="primary"
       sx={{
-        backgroundColor: "#1565C0",
-        zIndex: (theme) => theme.zIndex.drawer + 1,
+        zIndex: (theme) =>
+          theme.zIndex.drawer + 1,
       }}
     >
       <Toolbar>
-        {/* Logo */}
         <LocalHospitalIcon
           sx={{
             fontSize: 34,
             mr: 2,
           }}
         />
-        {/* Project Name */}
-        <Box sx={{ flexGrow: 1 }}>
+        <Box
+          sx={{
+            flexGrow: 1,
+          }}
+        >
           <Typography
             variant="h6"
             sx={{
-              fontWeight: "bold",
-              letterSpacing: 0.5,
+              fontWeight:
+                "bold",
+              letterSpacing:
+                0.5,
             }}
           >
-            Radiology Medical Image Viewing System
+            Radiology Medical
+            Image Viewing System
           </Typography>
           <Typography
             variant="caption"
             sx={{
-              opacity: 0.9,
+              opacity:
+                0.9,
             }}
           >
-            Radiology Information System (RIS)
+            Radiology
+            Information System
+            (RIS)
           </Typography>
         </Box>
-        {/* Notification */}
-        <IconButton color="inherit">
+        <IconButton
+          color="inherit"
+        >
           <Badge
             badgeContent={3}
             color="error"
@@ -57,36 +118,45 @@ function Navbar() {
             <NotificationsIcon />
           </Badge>
         </IconButton>
-        {/* User */}
         <Box
           sx={{
-            display: "flex",
-            alignItems: "center",
-            ml: 2,
-         }}
+            display:
+              "flex",
+            alignItems:
+              "center",
+            ml:
+              2,
+          }}
         >
           <Avatar
             sx={{
-              bgcolor: "white",
-              color: "#1565C0",
-              width: 36,
-              height: 36,
-              mr: 1,
+              bgcolor:
+                "background.paper",
+              color:
+                "primary.main",
+              width:
+                36,
+              height:
+                36,
+              mr:
+                1,
             }}
           >
-            <AccountCircleIcon />
+            {getInitials(
+              userName
+            )}
           </Avatar>
           <Box>
             <Typography
               variant="body2"
               fontWeight="bold"
             >
-              Admin
+              {userName}
             </Typography>
             <Typography
               variant="caption"
             >
-              Radiologist
+              {department}
             </Typography>
           </Box>
         </Box>
@@ -94,5 +164,4 @@ function Navbar() {
     </AppBar>
   );
 }
-
 export default Navbar;
