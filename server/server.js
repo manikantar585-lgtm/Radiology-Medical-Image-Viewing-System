@@ -3,52 +3,181 @@ const cors = require("cors");
 const sql = require("mssql");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
-const app = express();
-app.use(cors());
-app.use(express.json());
 
-const config = {
-  server: "localhost",
-  database: "RadiologyDB",
-  user: "Mani",
-  password: "Mani@7013",
+const app = express();
+
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
+app.use(
+  express.json({
+    limit: "50mb",
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "50mb",
+  })
+);
+
+
+/* =========================
+   SQL SERVER CONFIGURATION
+========================= */
+
+const dbConfig = {
+  user: process.env.DB_USER || "Mani",
+
+  password:
+    process.env.DB_PASSWORD ||
+    "Mani@7013",
+
+  server:
+    process.env.DB_SERVER ||
+    "localhost",
+
+  database:
+    process.env.DB_NAME ||
+    "RadiologyDB",
+
   options: {
     encrypt: false,
     trustServerCertificate: true,
   },
-};
-let pool;
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 20 * 1024 * 1024,
+
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
   },
-});
-function getUserId(req) {
-  const headerUserId = req.headers["x-user-id"];
-  const bodyUserId =
-    req.body && req.body.userId
-      ? req.body.userId
-      : null;
-  const queryUserId =
-    req.query && req.query.userId
-      ? req.query.userId
-      : null;
-  const userId =
-    headerUserId ||
-    bodyUserId ||
-    queryUserId;
-  const parsedUserId =
-    Number(userId);
-  if (
-    !parsedUserId ||
-    Number.isNaN(parsedUserId)
-  ) {
-    return null;
+
+  requestTimeout: 120000,
+};
+
+
+/* =========================
+   SQL CONNECTION POOL
+========================= */
+
+let pool;
+
+async function connectDatabase() {
+  try {
+    pool = await sql.connect(
+      dbConfig
+    );
+
+    console.log(
+      "SQL Server Connected Successfully"
+    );
+
+    await initializeDatabase();
+
+    console.log(
+      "Database initialization completed"
+    );
+  } catch (error) {
+    console.log(
+      "Database Connection Failed"
+    );
+
+    console.log(
+      error.message
+    );
+
+    process.exit(1);
   }
-  return parsedUserId;
 }
-async function userExists(userId) {
+
+
+/* =========================
+   USER ID HELPER
+========================= */
+
+function getUserId(req) {
+  const headerUserId =
+    req.headers["x-user-id"];
+
+  if (
+    headerUserId !== undefined &&
+    headerUserId !== null &&
+    String(headerUserId).trim() !== ""
+  ) {
+    const id = Number(
+      headerUserId
+    );
+
+    if (
+      Number.isInteger(id) &&
+      id > 0
+    ) {
+      return id;
+    }
+  }
+
+  const bodyUserId =
+    req.body &&
+    req.body.userId;
+
+  if (
+    bodyUserId !== undefined &&
+    bodyUserId !== null &&
+    String(bodyUserId).trim() !== ""
+  ) {
+    const id = Number(
+      bodyUserId
+    );
+
+    if (
+      Number.isInteger(id) &&
+      id > 0
+    ) {
+      return id;
+    }
+  }
+
+  const queryUserId =
+    req.query &&
+    req.query.userId;
+
+  if (
+    queryUserId !== undefined &&
+    queryUserId !== null &&
+    String(queryUserId).trim() !== ""
+  ) {
+    const id = Number(
+      queryUserId
+    );
+
+    if (
+      Number.isInteger(id) &&
+      id > 0
+    ) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+
+/* =========================
+   CHECK USER
+========================= */
+
+async function userExists(
+  userId
+) {
+  if (!userId) {
+    return false;
+  }
+
   const result =
     await pool
       .request()
@@ -62,182 +191,755 @@ async function userExists(userId) {
         FROM dbo.Users
         WHERE Id = @userId
       `);
-  return result.recordset.length > 0;
+
+  return (
+    result.recordset.length >
+    0
+  );
 }
-async function connectDatabase() {
+
+
+/* =========================
+   MULTER CONFIGURATION
+========================= */
+
+const storage =
+  multer.memoryStorage();
+
+const upload = multer({
+  storage,
+
+  limits: {
+    // Kept in sync with MAX_UPLOAD_FILE_SIZE_BYTES in the frontend's
+    // ImageViewer component. These two values must always match, or
+    // files between the two limits will pass the client-side check
+    // and then be silently rejected by the server.
+    fileSize:
+      100 * 1024 * 1024,
+
+    files: 500,
+  },
+
+  fileFilter:
+    (req, file, cb) => {
+      const fileName =
+        String(
+          file.originalname || ""
+        ).toLowerCase();
+
+      const mime =
+        String(
+          file.mimetype || ""
+        ).toLowerCase();
+
+      const extension =
+        fileName.includes(".")
+          ? fileName
+              .substring(
+                fileName.lastIndexOf(
+                  "."
+                )
+              )
+          : "";
+
+      const allowedExtensions =
+        [
+          ".dcm",
+          ".dicom",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".webp",
+          ".bmp",
+          ".tif",
+          ".tiff",
+        ];
+
+      const allowedMimeTypes =
+        [
+          "application/dicom",
+          "application/octet-stream",
+          "image/png",
+          "image/jpeg",
+          "image/webp",
+          "image/bmp",
+          "image/tiff",
+        ];
+
+      /*
+       * DICOM files sometimes arrive
+       * with application/octet-stream,
+       * so we allow that MIME type.
+       *
+       * We also allow normal image files
+       * because the existing application
+       * supports regular image uploads.
+       */
+
+      if (
+        allowedExtensions.includes(
+          extension
+        ) ||
+        allowedMimeTypes.includes(
+          mime
+        ) ||
+        !extension
+      ) {
+        return cb(
+          null,
+          true
+        );
+      }
+
+      return cb(
+        new Error(
+          "Unsupported file type"
+        )
+      );
+    },
+});
+
+
+/* =========================
+   DATABASE INITIALIZATION
+========================= */
+
+async function initializeDatabase() {
   try {
-    pool = await sql.connect(config);
-    console.log(
-      "Connected to RadiologyDB"
-    );
-    await pool.request().query(`
-      IF NOT EXISTS (
-        SELECT *
-        FROM sys.tables
-        WHERE name = 'Patients'
-      )
-      BEGIN
-        CREATE TABLE dbo.Patients
-        (
-          Id INT IDENTITY(1,1)
-            PRIMARY KEY,
-          UserId INT NULL,
-          Name NVARCHAR(100)
-            NOT NULL,
-          Age INT NOT NULL,
-          Gender NVARCHAR(20)
-            NOT NULL,
-          Phone NVARCHAR(20)
-            NOT NULL,
-          CreatedAt DATETIME
-            DEFAULT GETDATE()
-        )
-      END
-    `);
-    await pool.request().query(`
-      IF COL_LENGTH(
-        'dbo.Patients',
-        'UserId'
-      ) IS NULL
-      BEGIN
-        ALTER TABLE dbo.Patients
-        ADD UserId INT NULL
-      END
-    `);
-    await pool.request().query(`
-      IF NOT EXISTS (
-        SELECT *
-        FROM sys.tables
-        WHERE name = 'Studies'
-      )
-      BEGIN
-        CREATE TABLE dbo.Studies
-        (
-          Id INT IDENTITY(1,1)
-            PRIMARY KEY,
-          UserId INT NULL,
-          PatientId INT NOT NULL,
-          StudyId NVARCHAR(50)
-            NOT NULL,
-          Modality NVARCHAR(50)
-            NOT NULL,
-          BodyPart NVARCHAR(100)
-            NOT NULL,
-          StudyDate DATE NOT NULL,
-          Status NVARCHAR(50)
-            NOT NULL
-            DEFAULT 'Completed',
-          CreatedAt DATETIME
-            DEFAULT GETDATE()
-        )
-      END
-    `);
-    await pool.request().query(`
-      IF COL_LENGTH(
-        'dbo.Studies',
-        'UserId'
-      ) IS NULL
-      BEGIN
-        ALTER TABLE dbo.Studies
-        ADD UserId INT NULL
-      END
-    `);
-    await pool.request().query(`
-      IF NOT EXISTS (
-        SELECT *
-        FROM sys.tables
-        WHERE name = 'PatientImages'
-      )
-      BEGIN
-        CREATE TABLE dbo.PatientImages
-        (
-          Id INT IDENTITY(1,1)
-            PRIMARY KEY,
-          UserId INT NULL,
-          PatientId INT NOT NULL,
-          StudyId INT NULL,
-          FileName NVARCHAR(255)
-            NOT NULL,
-          ContentType NVARCHAR(100)
-            NOT NULL,
-          ImageData VARBINARY(MAX)
-            NOT NULL,
-          CreatedAt DATETIME
-            DEFAULT GETDATE()
-        )
-      END
-    `);
-    await pool.request().query(`
-      IF COL_LENGTH(
-        'dbo.PatientImages',
-        'UserId'
-      ) IS NULL
-      BEGIN
-        ALTER TABLE dbo.PatientImages
-        ADD UserId INT NULL
-      END
-    `);
-    await pool.request().query(`
-      IF NOT EXISTS (
-        SELECT *
-        FROM sys.tables
-        WHERE name = 'Reports'
-      )
-      BEGIN
-        CREATE TABLE dbo.Reports
-        (
-          Id INT IDENTITY(1,1)
-            PRIMARY KEY,
-          UserId INT NULL,
-          PatientId INT NULL,
-          StudyId INT NULL,
-          RadiologistName
-            NVARCHAR(150) NULL,
-          Findings
-            NVARCHAR(MAX) NULL,
-          Impression
-            NVARCHAR(MAX) NULL,
-          Status
-            NVARCHAR(50) NULL
-            DEFAULT 'Completed',
-          ReportDate DATETIME NULL
-            DEFAULT GETDATE(),
-          CreatedAt DATETIME NULL
-            DEFAULT GETDATE()
-        )
-      END
-    `);
-    await pool.request().query(`
-      IF COL_LENGTH(
-        'dbo.Reports',
-        'UserId'
-      ) IS NULL
-      BEGIN
-        ALTER TABLE dbo.Reports
-        ADD UserId INT NULL
-      END
-    `);
-    await pool.request().query(`
-      IF COL_LENGTH(
-        'dbo.PatientImages',
-        'StudyId'
-      ) IS NULL
-      BEGIN
-        ALTER TABLE dbo.PatientImages
-        ADD StudyId INT NULL
-      END
-    `);
-    const firstUser =
-      await pool.request().query(`
-        SELECT TOP 1 Id
-        FROM dbo.Users
-        ORDER BY Id ASC
+    /*
+     * USERS
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.Users',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.Users
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            FullName
+              NVARCHAR(100)
+              NOT NULL,
+
+            Email
+              NVARCHAR(150)
+              NOT NULL
+              UNIQUE,
+
+            Mobile
+              NVARCHAR(20)
+              NOT NULL,
+
+            EmployeeId
+              NVARCHAR(50)
+              NOT NULL
+              UNIQUE,
+
+            Department
+              NVARCHAR(100)
+              NOT NULL,
+
+            Password
+              NVARCHAR(255)
+              NOT NULL,
+
+            CreatedAt DATETIME
+              DEFAULT GETDATE()
+          )
+        END
       `);
+
+
+    /*
+     * PATIENTS
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.Patients',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.Patients
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            UserId INT NULL,
+
+            Name
+              NVARCHAR(100)
+              NOT NULL,
+
+            Age INT NULL,
+
+            Gender
+              NVARCHAR(20)
+              NULL,
+
+            Phone
+              NVARCHAR(20)
+              NULL,
+
+            CreatedAt DATETIME
+              DEFAULT GETDATE()
+          )
+        END
+      `);
+
+
+    /*
+     * ADD USER ID TO PATIENTS
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Patients',
+          'UserId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Patients
+          ADD UserId INT NULL
+        END
+      `);
+
+
+    /*
+     * STUDIES
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.Studies',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.Studies
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            UserId INT NULL,
+
+            PatientId INT NOT NULL,
+
+            StudyDate DATETIME NULL,
+
+            StudyDescription
+              NVARCHAR(200)
+              NULL,
+
+            Modality
+              NVARCHAR(50)
+              NULL,
+
+            CreatedAt DATETIME
+              DEFAULT GETDATE()
+          )
+        END
+      `);
+
+
+    /*
+     * ADD USER ID TO STUDIES
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Studies',
+          'UserId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Studies
+          ADD UserId INT NULL
+        END
+      `);
+
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Studies',
+          'StudyDescription'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Studies
+          ADD StudyDescription NVARCHAR(200) NULL
+        END
+      `);
+
+
+    /*
+     * ADD STUDY ID (business identifier,
+     * e.g. "ST001" — distinct from the
+     * auto-incrementing Id primary key)
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Studies',
+          'StudyId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Studies
+          ADD StudyId NVARCHAR(100) NULL
+        END
+      `);
+
+
+    /*
+     * ADD BODY PART
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Studies',
+          'BodyPart'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Studies
+          ADD BodyPart NVARCHAR(100) NULL
+        END
+      `);
+
+
+    /*
+     * PATIENT IMAGES
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.PatientImages',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.PatientImages
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            UserId INT NULL,
+
+            PatientId INT NOT NULL,
+
+            StudyId INT NULL,
+
+            SeriesId INT NULL,
+
+            ImageOrder INT NULL,
+
+            FileName
+              NVARCHAR(255)
+              NULL,
+
+            ContentType
+              NVARCHAR(100)
+              NULL,
+
+            ImageData
+              VARBINARY(MAX)
+              NULL,
+
+            CreatedAt DATETIME
+              DEFAULT GETDATE()
+          )
+        END
+      `);
+
+
+    /*
+     * ADD IMAGE USER ID
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.PatientImages',
+          'UserId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.PatientImages
+          ADD UserId INT NULL
+        END
+      `);
+
+
+    /*
+     * ADD STUDY ID
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.PatientImages',
+          'StudyId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.PatientImages
+          ADD StudyId INT NULL
+        END
+      `);
+
+
+    /*
+     * ADD SERIES ID
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.PatientImages',
+          'SeriesId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.PatientImages
+          ADD SeriesId INT NULL
+        END
+      `);
+
+
+    /*
+     * ADD IMAGE ORDER
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.PatientImages',
+          'ImageOrder'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.PatientImages
+          ADD ImageOrder INT NULL
+        END
+      `);
+
+
+    /*
+     * REPORTS
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.Reports',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.Reports
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            UserId INT NULL,
+
+            PatientId INT NULL,
+
+            StudyId INT NULL,
+
+            RadiologistName
+              NVARCHAR(150)
+              NULL,
+
+            Findings
+              NVARCHAR(MAX)
+              NULL,
+
+            Impression
+              NVARCHAR(MAX)
+              NULL,
+
+            Status
+              NVARCHAR(50)
+              NULL
+              DEFAULT 'Completed',
+
+            ReportDate DATETIME
+              NULL
+              DEFAULT GETDATE(),
+
+            CreatedAt DATETIME
+              NULL
+              DEFAULT GETDATE()
+          )
+        END
+      `);
+
+
+    /*
+     * ADD REPORT USER ID
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Reports',
+          'UserId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Reports
+          ADD UserId INT NULL
+        END
+      `);
+
+
+    /*
+     * SERIES
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF OBJECT_ID(
+          'dbo.Series',
+          'U'
+        ) IS NULL
+        BEGIN
+          CREATE TABLE dbo.Series
+          (
+            Id INT IDENTITY(1,1)
+              PRIMARY KEY,
+
+            UserId INT NULL,
+
+            PatientId INT NOT NULL,
+
+            StudyId INT NOT NULL,
+
+            SeriesNumber INT NOT NULL,
+
+            SeriesDescription
+              NVARCHAR(200)
+              NULL,
+
+            Modality
+              NVARCHAR(50)
+              NULL,
+
+            CreatedAt DATETIME
+              DEFAULT GETDATE()
+          )
+        END
+      `);
+
+
+    /*
+     * SERIES USER ID
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Series',
+          'UserId'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Series
+          ADD UserId INT NULL
+        END
+      `);
+
+
+    /*
+     * SERIES DESCRIPTION
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Series',
+          'SeriesDescription'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Series
+          ADD SeriesDescription
+            NVARCHAR(200) NULL
+        END
+      `);
+
+
+    /*
+     * SERIES MODALITY
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Series',
+          'Modality'
+        ) IS NULL
+        BEGIN
+          ALTER TABLE dbo.Series
+          ADD Modality
+            NVARCHAR(50) NULL
+        END
+      `);
+
+
+    /*
+     * SERIES NAME
+     *
+     * Keep old database compatible.
+     */
+
+    await pool
+      .request()
+      .query(`
+        IF COL_LENGTH(
+          'dbo.Series',
+          'SeriesName'
+        ) IS NOT NULL
+        BEGIN
+          ALTER TABLE dbo.Series
+          ALTER COLUMN SeriesName
+            NVARCHAR(200) NULL
+        END
+      `);
+
+
+    /*
+     * CREATE SERIES FOR EXISTING
+     * STUDIES THAT ALREADY HAVE IMAGES
+     */
+
+    await pool
+      .request()
+      .query(`
+        INSERT INTO dbo.Series
+        (
+          UserId,
+          PatientId,
+          StudyId,
+          SeriesNumber,
+          SeriesDescription,
+          Modality
+        )
+
+        SELECT
+          st.UserId,
+          st.PatientId,
+          st.Id,
+          1,
+          'Primary Image Series',
+          st.Modality
+
+        FROM dbo.Studies st
+
+        WHERE EXISTS
+        (
+          SELECT 1
+
+          FROM dbo.PatientImages pi
+
+          WHERE pi.StudyId =
+            st.Id
+        )
+
+        AND NOT EXISTS
+        (
+          SELECT 1
+
+          FROM dbo.Series sr
+
+          WHERE sr.StudyId =
+            st.Id
+
+          AND sr.PatientId =
+            st.PatientId
+
+          AND sr.SeriesNumber =
+            1
+        );
+      `);
+
+
+    /*
+     * CONNECT OLD IMAGES TO
+     * PRIMARY SERIES
+     */
+
+    await pool
+      .request()
+      .query(`
+        UPDATE pi
+
+        SET pi.SeriesId =
+          sr.Id
+
+        FROM dbo.PatientImages pi
+
+        INNER JOIN dbo.Series sr
+          ON sr.StudyId =
+            pi.StudyId
+
+         AND sr.PatientId =
+            pi.PatientId
+
+         AND sr.SeriesNumber =
+            1
+
+        WHERE pi.SeriesId IS NULL
+      `);
+
+
+    /*
+     * FIND FIRST USER
+     */
+
+    const firstUser =
+      await pool
+        .request()
+        .query(`
+          SELECT TOP 1 Id
+          FROM dbo.Users
+          ORDER BY Id ASC
+        `);
+
+
+    /*
+     * REPAIR OLD RECORDS
+     */
+
     if (
-      firstUser.recordset.length > 0
+      firstUser.recordset.length >
+      0
     ) {
       const defaultUserId =
-        firstUser.recordset[0].Id;
+        firstUser
+          .recordset[0]
+          .Id;
+
+
       await pool
         .request()
         .input(
@@ -247,51 +949,112 @@ async function connectDatabase() {
         )
         .query(`
           UPDATE dbo.Patients
+
           SET UserId =
             @defaultUserId
+
           WHERE UserId IS NULL
         `);
-      await pool.request().query(`
-        UPDATE s
-        SET s.UserId =
-          p.UserId
-        FROM dbo.Studies s
-        INNER JOIN dbo.Patients p
-          ON p.Id = s.PatientId
-        WHERE s.UserId IS NULL
-      `);
-      await pool.request().query(`
-        UPDATE pi
-        SET pi.UserId =
-          p.UserId
-        FROM dbo.PatientImages pi
-        INNER JOIN dbo.Patients p
-          ON p.Id = pi.PatientId
-        WHERE pi.UserId IS NULL
-      `);
-      await pool.request().query(`
-        UPDATE r
-        SET r.UserId =
-          p.UserId
-        FROM dbo.Reports r
-        INNER JOIN dbo.Patients p
-          ON p.Id = r.PatientId
-        WHERE r.UserId IS NULL
-      `);
+
+
+      await pool
+        .request()
+        .query(`
+          UPDATE s
+
+          SET s.UserId =
+            p.UserId
+
+          FROM dbo.Studies s
+
+          INNER JOIN dbo.Patients p
+            ON p.Id =
+              s.PatientId
+
+          WHERE s.UserId IS NULL
+        `);
+
+
+      await pool
+        .request()
+        .query(`
+          UPDATE pi
+
+          SET pi.UserId =
+            p.UserId
+
+          FROM dbo.PatientImages pi
+
+          INNER JOIN dbo.Patients p
+            ON p.Id =
+              pi.PatientId
+
+          WHERE pi.UserId IS NULL
+        `);
+
+
+      await pool
+        .request()
+        .query(`
+          UPDATE r
+
+          SET r.UserId =
+            p.UserId
+
+          FROM dbo.Reports r
+
+          INNER JOIN dbo.Patients p
+            ON p.Id =
+              r.PatientId
+
+          WHERE r.UserId IS NULL
+        `);
+
+
+      await pool
+        .request()
+        .query(`
+          UPDATE sr
+
+          SET sr.UserId =
+            p.UserId
+
+          FROM dbo.Series sr
+
+          INNER JOIN dbo.Patients p
+            ON p.Id =
+              sr.PatientId
+
+          WHERE sr.UserId IS NULL
+        `);
     }
+
+
     console.log(
       "User data separation is ready"
     );
+
+    console.log(
+      "Series support is ready"
+    );
   } catch (error) {
     console.log(
-      "Database Connection Failed"
+      "Database Initialization Error"
     );
+
     console.log(
       error.message
     );
-    process.exit(1);
+
+    throw error;
   }
 }
+
+
+/* =========================
+   HOME
+========================= */
+
 app.get(
   "/",
   (req, res) => {
@@ -300,6 +1063,12 @@ app.get(
     );
   }
 );
+
+
+/* =========================
+   REGISTER
+========================= */
+
 app.post(
   "/api/register",
   async (req, res) => {
@@ -312,6 +1081,8 @@ app.post(
         department,
         password,
       } = req.body;
+
+
       if (
         !fullName ||
         !email ||
@@ -326,30 +1097,37 @@ app.post(
             "Please fill all fields",
         });
       }
+
+
       const existingUser =
         await pool
           .request()
           .input(
             "email",
             sql.NVarChar(150),
-            email
+            email.trim()
           )
           .input(
             "employeeId",
             sql.NVarChar(50),
-            employeeId
+            employeeId.trim()
           )
           .query(`
             SELECT Id
+
             FROM dbo.Users
+
             WHERE Email =
               @email
+
             OR EmployeeId =
               @employeeId
           `);
+
+
       if (
-        existingUser.recordset
-          .length > 0
+        existingUser.recordset.length >
+        0
       ) {
         return res.status(409).json({
           success: false,
@@ -357,37 +1135,41 @@ app.post(
             "Email or Employee ID already exists",
         });
       }
+
+
       const hashedPassword =
         await bcrypt.hash(
           password,
           10
         );
+
+
       await pool
         .request()
         .input(
           "fullName",
           sql.NVarChar(100),
-          fullName
+          fullName.trim()
         )
         .input(
           "email",
           sql.NVarChar(150),
-          email
+          email.trim()
         )
         .input(
           "mobile",
           sql.NVarChar(20),
-          mobile
+          mobile.trim()
         )
         .input(
           "employeeId",
           sql.NVarChar(50),
-          employeeId
+          employeeId.trim()
         )
         .input(
           "department",
           sql.NVarChar(100),
-          department
+          department.trim()
         )
         .input(
           "password",
@@ -404,6 +1186,7 @@ app.post(
             Department,
             Password
           )
+
           VALUES
           (
             @fullName,
@@ -414,9 +1197,13 @@ app.post(
             @password
           )
         `);
+
+
       console.log(
         `New user registered: ${email}`
       );
+
+
       res.status(201).json({
         success: true,
         message:
@@ -426,7 +1213,9 @@ app.post(
       console.log(
         "Registration Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -435,6 +1224,12 @@ app.post(
     }
   }
 );
+
+
+/* =========================
+   LOGIN
+========================= */
+
 app.post(
   "/api/login",
   async (req, res) => {
@@ -443,6 +1238,8 @@ app.post(
         email,
         password,
       } = req.body;
+
+
       if (
         !email ||
         !password
@@ -453,13 +1250,15 @@ app.post(
             "Please enter email and password",
         });
       }
+
+
       const result =
         await pool
           .request()
           .input(
             "email",
             sql.NVarChar(150),
-            email
+            email.trim()
           )
           .query(`
             SELECT
@@ -470,12 +1269,17 @@ app.post(
               EmployeeId,
               Department,
               Password
+
             FROM dbo.Users
+
             WHERE Email =
               @email
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(401).json({
           success: false,
@@ -483,13 +1287,19 @@ app.post(
             "Invalid Email or Password",
         });
       }
+
+
       const user =
         result.recordset[0];
+
+
       const passwordMatch =
         await bcrypt.compare(
           password,
           user.Password
         );
+
+
       if (!passwordMatch) {
         return res.status(401).json({
           success: false,
@@ -497,24 +1307,35 @@ app.post(
             "Invalid Email or Password",
         });
       }
+
+
       console.log(
         `Login successful: ${email}`
       );
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Login Successful",
+
         user: {
           id:
             user.Id,
+
           fullName:
             user.FullName,
+
           email:
             user.Email,
+
           mobile:
             user.Mobile,
+
           employeeId:
             user.EmployeeId,
+
           department:
             user.Department,
         },
@@ -523,7 +1344,9 @@ app.post(
       console.log(
         "Login Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -532,6 +1355,12 @@ app.post(
     }
   }
 );
+
+
+/* =========================
+   UPDATE PROFILE
+========================= */
+
 app.put(
   "/api/users/:id",
   async (req, res) => {
@@ -540,11 +1369,15 @@ app.put(
         Number(
           req.params.id
         );
+
+
       const {
         fullName,
         mobile,
         department,
       } = req.body;
+
+
       if (!userId) {
         return res.status(400).json({
           success: false,
@@ -552,6 +1385,8 @@ app.put(
             "Invalid user ID",
         });
       }
+
+
       if (
         !fullName ||
         !mobile ||
@@ -563,6 +1398,8 @@ app.put(
             "Please fill all profile fields",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -588,31 +1425,43 @@ app.put(
           )
           .query(`
             UPDATE dbo.Users
+
             SET
-            FullName =
-            @fullName,
-            Mobile =
-            @mobile,
-            Department =
-            @department
+              FullName =
+                @fullName,
+
+              Mobile =
+                @mobile,
+
+              Department =
+                @department
+
             OUTPUT
-              INSERTED.Id
-              AS id,
+              INSERTED.Id AS id,
+
               INSERTED.FullName
-              AS fullName,
+                AS fullName,
+
               INSERTED.Email
-              AS email,
+                AS email,
+
               INSERTED.Mobile
-              AS mobile,
+                AS mobile,
+
               INSERTED.EmployeeId
-              AS employeeId,
+                AS employeeId,
+
               INSERTED.Department
-              AS department
+                AS department
+
             WHERE Id =
               @id
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(404).json({
           success: false,
@@ -620,10 +1469,14 @@ app.put(
             "User not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Profile updated successfully",
+
         user:
           result.recordset[0],
       });
@@ -631,7 +1484,9 @@ app.put(
       console.log(
         "Update Profile Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -640,6 +1495,12 @@ app.put(
     }
   }
 );
+
+
+/* =========================
+   CHANGE PASSWORD
+========================= */
+
 app.post(
   "/api/change-password",
   async (req, res) => {
@@ -649,6 +1510,8 @@ app.post(
         currentPassword,
         newPassword,
       } = req.body;
+
+
       if (
         !userId ||
         !currentPassword ||
@@ -660,11 +1523,19 @@ app.post(
             "Please fill all password fields",
         });
       }
+
+
       if (
         newPassword.length < 8 ||
-        !/[A-Z]/.test(newPassword) ||
-        !/[a-z]/.test(newPassword) ||
-        !/[0-9]/.test(newPassword)
+        !/[A-Z]/.test(
+          newPassword
+        ) ||
+        !/[a-z]/.test(
+          newPassword
+        ) ||
+        !/[0-9]/.test(
+          newPassword
+        )
       ) {
         return res.status(400).json({
           success: false,
@@ -672,6 +1543,8 @@ app.post(
             "New password must contain at least 8 characters, one uppercase letter, one lowercase letter, and one number",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -684,12 +1557,17 @@ app.post(
             SELECT
               Id,
               Password
+
             FROM dbo.Users
+
             WHERE Id =
               @userId
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(404).json({
           success: false,
@@ -697,13 +1575,19 @@ app.post(
             "User not found",
         });
       }
+
+
       const user =
         result.recordset[0];
+
+
       const passwordMatch =
         await bcrypt.compare(
           currentPassword,
           user.Password
         );
+
+
       if (!passwordMatch) {
         return res.status(401).json({
           success: false,
@@ -711,6 +1595,8 @@ app.post(
             "Current password is incorrect",
         });
       }
+
+
       if (
         currentPassword ===
         newPassword
@@ -721,11 +1607,15 @@ app.post(
             "New password must be different from the current password",
         });
       }
+
+
       const hashedPassword =
         await bcrypt.hash(
           newPassword,
           10
         );
+
+
       await pool
         .request()
         .input(
@@ -740,11 +1630,15 @@ app.post(
         )
         .query(`
           UPDATE dbo.Users
+
           SET Password =
             @password
+
           WHERE Id =
             @userId
         `);
+
+
       res.status(200).json({
         success: true,
         message:
@@ -754,7 +1648,9 @@ app.post(
       console.log(
         "Change Password Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -763,12 +1659,20 @@ app.post(
     }
   }
 );
+
+
+/* =========================
+   GET ALL PATIENTS
+========================= */
+
 app.get(
   "/api/patients",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       if (!userId) {
         return res.status(401).json({
           success: false,
@@ -776,8 +1680,14 @@ app.get(
             "User ID is required",
         });
       }
+
+
       const exists =
-        await userExists(userId);
+        await userExists(
+          userId
+        );
+
+
       if (!exists) {
         return res.status(401).json({
           success: false,
@@ -785,6 +1695,8 @@ app.get(
             "Invalid user",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -796,18 +1708,30 @@ app.get(
           .query(`
             SELECT
               Id AS id,
+
               Name AS name,
+
               Age AS age,
+
               Gender AS gender,
+
               Phone AS phone,
+
               CreatedAt AS createdAt
+
             FROM dbo.Patients
+
             WHERE UserId =
               @userId
-            ORDER BY Id DESC
+
+            ORDER BY
+              Id DESC
           `);
+
+
       res.status(200).json({
         success: true,
+
         patients:
           result.recordset,
       });
@@ -815,7 +1739,9 @@ app.get(
       console.log(
         "Get Patients Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -824,16 +1750,26 @@ app.get(
     }
   }
 );
+
+
+/* =========================
+   GET SINGLE PATIENT
+========================= */
+
 app.get(
   "/api/patients/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const patientId =
         Number(
           req.params.id
         );
+
+
       if (
         !userId ||
         !patientId
@@ -844,6 +1780,8 @@ app.get(
             "User ID and Patient ID are required",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -860,19 +1798,30 @@ app.get(
           .query(`
             SELECT
               Id AS id,
+
               Name AS name,
+
               Age AS age,
+
               Gender AS gender,
+
               Phone AS phone,
+
               CreatedAt AS createdAt
+
             FROM dbo.Patients
+
             WHERE Id =
               @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(404).json({
           success: false,
@@ -880,8 +1829,11 @@ app.get(
             "Patient not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         patient:
           result.recordset[0],
       });
@@ -889,7 +1841,9 @@ app.get(
       console.log(
         "Get Patient Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -898,18 +1852,28 @@ app.get(
     }
   }
 );
+
+
+/* =========================
+   CREATE PATIENT
+========================= */
+
 app.post(
   "/api/patients",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const {
         name,
         age,
         gender,
         phone,
       } = req.body;
+
+
       if (!userId) {
         return res.status(401).json({
           success: false,
@@ -917,6 +1881,8 @@ app.post(
             "User ID is required",
         });
       }
+
+
       if (
         !name ||
         !age ||
@@ -929,8 +1895,14 @@ app.post(
             "Please fill all patient fields",
         });
       }
+
+
       const exists =
-        await userExists(userId);
+        await userExists(
+          userId
+        );
+
+
       if (!exists) {
         return res.status(401).json({
           success: false,
@@ -938,6 +1910,8 @@ app.post(
             "Invalid user",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -975,13 +1949,21 @@ app.post(
               Gender,
               Phone
             )
+
             OUTPUT
               INSERTED.Id AS id,
+
               INSERTED.Name AS name,
+
               INSERTED.Age AS age,
+
               INSERTED.Gender AS gender,
+
               INSERTED.Phone AS phone,
-              INSERTED.CreatedAt AS createdAt
+
+              INSERTED.CreatedAt
+                AS createdAt
+
             VALUES
             (
               @userId,
@@ -991,10 +1973,14 @@ app.post(
               @phone
             )
           `);
+
+
       res.status(201).json({
         success: true,
+
         message:
           "Patient created successfully",
+
         patient:
           result.recordset[0],
       });
@@ -1002,7 +1988,9 @@ app.post(
       console.log(
         "Create Patient Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -1011,22 +1999,34 @@ app.post(
     }
   }
 );
+
+
+/* =========================
+   UPDATE PATIENT
+========================= */
+
 app.put(
   "/api/patients/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const patientId =
         Number(
           req.params.id
         );
+
+
       const {
         name,
         age,
         gender,
         phone,
       } = req.body;
+
+
       if (
         !userId ||
         !patientId
@@ -1037,6 +2037,8 @@ app.put(
             "User ID and Patient ID are required",
         });
       }
+
+
       if (
         !name ||
         !age ||
@@ -1049,6 +2051,8 @@ app.put(
             "Please fill all patient fields",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -1084,40 +2088,60 @@ app.put(
           )
           .query(`
             UPDATE dbo.Patients
+
             SET
               Name =
                 @name,
+
               Age =
                 @age,
+
               Gender =
                 @gender,
+
               Phone =
                 @phone
+
             OUTPUT
               INSERTED.Id AS id,
+
               INSERTED.Name AS name,
+
               INSERTED.Age AS age,
+
               INSERTED.Gender AS gender,
+
               INSERTED.Phone AS phone,
-              INSERTED.CreatedAt AS createdAt
+
+              INSERTED.CreatedAt
+                AS createdAt
+
             WHERE Id =
               @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(404).json({
           success: false,
           message:
-            "Patient not found or you do not have permission to update this patient",
+            "Patient not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Patient updated successfully",
+
         patient:
           result.recordset[0],
       });
@@ -1125,7 +2149,9 @@ app.put(
       console.log(
         "Update Patient Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -1134,16 +2160,26 @@ app.put(
     }
   }
 );
+
+
+/* =========================
+   DELETE PATIENT
+========================= */
+
 app.delete(
   "/api/patients/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const patientId =
         Number(
           req.params.id
         );
+
+
       if (
         !userId ||
         !patientId
@@ -1154,63 +2190,8 @@ app.delete(
             "User ID and Patient ID are required",
         });
       }
-      await pool
-        .request()
-        .input(
-          "patientId",
-          sql.Int,
-          patientId
-        )
-        .input(
-          "userId",
-          sql.Int,
-          userId
-        )
-        .query(`
-          DELETE FROM dbo.PatientImages
-          WHERE PatientId =
-            @patientId
-          AND UserId =
-            @userId
-        `);
-      await pool
-        .request()
-        .input(
-          "patientId",
-          sql.Int,
-          patientId
-        )
-        .input(
-          "userId",
-          sql.Int,
-          userId
-        )
-        .query(`
-          DELETE FROM dbo.Reports
-          WHERE PatientId =
-            @patientId
-          AND UserId =
-            @userId
-        `);
-      await pool
-        .request()
-        .input(
-          "patientId",
-          sql.Int,
-          patientId
-        )
-        .input(
-          "userId",
-          sql.Int,
-          userId
-        )
-        .query(`
-          DELETE FROM dbo.Studies
-          WHERE PatientId =
-            @patientId
-          AND UserId =
-            @userId
-        `);
+
+
       const result =
         await pool
           .request()
@@ -1226,22 +2207,30 @@ app.delete(
           )
           .query(`
             DELETE FROM dbo.Patients
+
             WHERE Id =
               @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.rowsAffected[0] === 0
+        result.rowsAffected[0] ===
+        0
       ) {
         return res.status(404).json({
           success: false,
           message:
-            "Patient not found or you do not have permission to delete this patient",
+            "Patient not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Patient deleted successfully",
       });
@@ -1249,7 +2238,9 @@ app.delete(
       console.log(
         "Delete Patient Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -1258,268 +2249,70 @@ app.delete(
     }
   }
 );
-app.get(
-  "/api/patients/search",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      const search =
-        String(
-          req.query.search ||
-          ""
-        ).trim();
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "User ID is required",
-        });
-      }
-      const result =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .input(
-            "search",
-            sql.NVarChar(100),
-            `%${search}%`
-          )
-          .query(`
-            SELECT
-              Id AS id,
-              Name AS name,
-              Age AS age,
-              Gender AS gender,
-              Phone AS phone,
-              CreatedAt AS createdAt
-            FROM dbo.Patients
-            WHERE UserId =
-              @userId
-            AND
-            (
-              Name LIKE @search
-              OR Phone LIKE @search
-            )
-            ORDER BY Id DESC
-          `);
-      res.status(200).json({
-        success: true,
-        patients:
-          result.recordset,
-      });
-    } catch (error) {
-      console.log(
-        "Search Patients Error"
-      );
-      console.log(error);
-      res.status(500).json({ 
-        success: false,
-        message:
-          "Unable to search patients",
-      });
-    }
-  }
-);
-app.get(
-  "/api/studies",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "User ID is required",
-        });
-      }
-      const result =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT
-              s.Id AS id,
-              s.StudyId AS studyId,
-              s.PatientId AS patientId,
-              p.Name AS patientName,
-              s.Modality AS modality,
-              s.BodyPart AS bodyPart,
-              s.StudyDate AS studyDate,
-              s.Status AS status,
-              (
-                SELECT COUNT(*)
-                FROM dbo.PatientImages pi
-                WHERE pi.StudyId = s.Id
-                AND pi.PatientId = s.PatientId
-                AND pi.UserId = @userId
-              ) AS imageCount,
-              s.CreatedAt AS createdAt
-            FROM dbo.Studies s
-            INNER JOIN dbo.Patients p
-              ON p.Id = s.PatientId
-            WHERE s.UserId =
-              @userId
-            AND p.UserId =
-              @userId
-            ORDER BY s.Id DESC
-          `);
-      res.status(200).json({
-        success: true,
-        studies:
-          result.recordset,
-      });
-    } catch (error) {
-      console.log(
-        "Get Studies Error"
-      );
-      console.log(error);
-      res.status(500).json({
-        success: false,
-        message:
-          "Unable to get studies",
-      });
-    }
-  }
-);
-app.get(
-  "/api/studies/:id",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      const studyDatabaseId =
-        Number(
-          req.params.id
-        );
-      if (
-        !userId ||
-        !studyDatabaseId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "User ID and Study ID are required",
-        });
-      }
-      const result =
-        await pool
-          .request()
-          .input(
-            "id",
-            sql.Int,
-            studyDatabaseId
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT
-              s.Id AS id,
-              s.StudyId AS studyId,
-              s.PatientId AS patientId,
-              p.Name AS patientName,
-              s.Modality AS modality,
-              s.BodyPart AS bodyPart,
-              s.StudyDate AS studyDate,
-              s.Status AS status,
-              (
-                SELECT COUNT(*)
-                FROM dbo.PatientImages pi
-                WHERE pi.StudyId = s.Id
-                AND pi.PatientId = s.PatientId
-                AND pi.UserId = @userId
-              ) AS imageCount,
-              s.CreatedAt AS createdAt
-            FROM dbo.Studies s
-            INNER JOIN dbo.Patients p
-              ON p.Id = s.PatientId
-            WHERE s.Id =
-              @id
-            AND s.UserId =
-              @userId
-            AND p.UserId =
-              @userId
-          `);
-      if (
-        result.recordset.length === 0
-      ) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Study not found",
-        });
-      }
-      res.status(200).json({
-        success: true,
-        study:
-          result.recordset[0],
-      });
-    } catch (error) {
-      console.log(
-        "Get Study Error"
-      );
-      console.log(error);
-      res.status(500).json({
-        success: false,
-        message:
-          "Unable to get study",
-      });
-    }
-  }
-);
+
+
+/* =========================
+   CREATE STUDY
+========================= */
+
 app.post(
   "/api/studies",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const {
         patientId,
         studyId,
-        modality,
         bodyPart,
         studyDate,
+        studyDescription,
+        modality,
         status,
       } = req.body;
-      if (!userId) {
-        return res.status(401).json({
+
+
+      const numericPatientId =
+        Number(
+          patientId
+        );
+
+
+      if (
+        !userId ||
+        !numericPatientId
+      ) {
+        return res.status(400).json({
           success: false,
           message:
-            "User ID is required",
+            "User ID and Patient ID are required",
         });
       }
+
+
       if (
-        !patientId ||
-        !studyId ||
-        !modality ||
-        !bodyPart ||
+        !String(studyId || "").trim() ||
+        !String(bodyPart || "").trim() ||
+        !String(modality || "").trim() ||
         !studyDate
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "Please fill all study fields",
+            "Study ID, modality, body part, and study date are required",
         });
       }
-      const patientResult =
+
+
+      const patient =
         await pool
           .request()
           .input(
             "patientId",
             sql.Int,
-            Number(patientId)
+            numericPatientId
           )
           .input(
             "userId",
@@ -1528,21 +2321,29 @@ app.post(
           )
           .query(`
             SELECT Id
+
             FROM dbo.Patients
+
             WHERE Id =
               @patientId
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        patientResult.recordset.length === 0
+        patient.recordset.length ===
+        0
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "You do not have permission to create a study for this patient",
+            "Patient not found or access denied",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -1554,33 +2355,51 @@ app.post(
           .input(
             "patientId",
             sql.Int,
-            Number(patientId)
+            numericPatientId
           )
           .input(
             "studyId",
-            sql.NVarChar(50),
-            studyId.trim()
-          )
-          .input(
-            "modality",
-            sql.NVarChar(50),
-            modality.trim()
+            sql.NVarChar(100),
+            studyId
+              ? String(studyId).trim()
+              : null
           )
           .input(
             "bodyPart",
             sql.NVarChar(100),
-            bodyPart.trim()
+            bodyPart
+              ? String(bodyPart).trim()
+              : null
           )
           .input(
             "studyDate",
-            sql.Date,
+            sql.DateTime,
             studyDate
+              ? new Date(
+                  studyDate
+                )
+              : new Date()
+          )
+          .input(
+            "studyDescription",
+            sql.NVarChar(200),
+            studyDescription
+              ? studyDescription.trim()
+              : null
+          )
+          .input(
+            "modality",
+            sql.NVarChar(50),
+            modality
+              ? modality.trim()
+              : null
           )
           .input(
             "status",
             sql.NVarChar(50),
-            status ||
-              "Completed"
+            status
+              ? String(status).trim()
+              : "Completed"
           )
           .query(`
             INSERT INTO dbo.Studies
@@ -1588,37 +2407,59 @@ app.post(
               UserId,
               PatientId,
               StudyId,
-              Modality,
               BodyPart,
               StudyDate,
+              StudyDescription,
+              Modality,
               Status
             )
 
             OUTPUT
               INSERTED.Id AS id,
-              INSERTED.StudyId AS studyId,
-              INSERTED.PatientId AS patientId,
-              INSERTED.Modality AS modality,
-              INSERTED.BodyPart AS bodyPart,
-              INSERTED.StudyDate AS studyDate,
-              INSERTED.Status AS status,
-              INSERTED.CreatedAt AS createdAt
+
+              INSERTED.UserId AS userId,
+
+              INSERTED.PatientId
+                AS patientId,
+
+              INSERTED.StudyId
+                AS studyId,
+
+              INSERTED.BodyPart
+                AS bodyPart,
+
+              INSERTED.StudyDate
+                AS studyDate,
+
+              INSERTED.StudyDescription
+                AS studyDescription,
+
+              INSERTED.Modality
+                AS modality,
+
+              INSERTED.CreatedAt
+                AS createdAt
 
             VALUES
             (
               @userId,
               @patientId,
               @studyId,
-              @modality,
               @bodyPart,
               @studyDate,
+              @studyDescription,
+              @modality,
               @status
             )
           `);
+
+
       res.status(201).json({
         success: true,
+
         message:
           "Study created successfully",
+
         study:
           result.recordset[0],
       });
@@ -1626,7 +2467,9 @@ app.post(
       console.log(
         "Create Study Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
@@ -1635,305 +2478,28 @@ app.post(
     }
   }
 );
-app.put(
-  "/api/studies/:id",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      const studyDatabaseId =
-        Number(
-          req.params.id
-        );
-      const {
-        patientId,
-        studyId,
-        modality,
-        bodyPart,
-        studyDate,
-        status,
-      } = req.body;
-      if (
-        !userId ||
-        !studyDatabaseId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "User ID and Study ID are required",
-        });
-      }
 
-      if (
-        !patientId ||
-        !studyId ||
-        !modality ||
-        !bodyPart ||
-        !studyDate
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Please fill all study fields",
-        });
-      }
-      const patientResult =
-        await pool
-          .request()
-          .input(
-            "patientId",
-            sql.Int,
-            Number(patientId)
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT Id
-            FROM dbo.Patients
-            WHERE Id =
-              @patientId
-            AND UserId =
-              @userId
-          `);
-      if (
-        patientResult.recordset.length === 0
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You do not have permission to use this patient",
-        });
-      }
-      const result =
-        await pool
-          .request()
-          .input(
-            "id",
-            sql.Int,
-            studyDatabaseId
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .input(
-            "patientId",
-            sql.Int,
-            Number(patientId)
-          )
-          .input(
-            "studyId",
-            sql.NVarChar(50),
-            studyId.trim()
-          )
-          .input(
-            "modality",
-            sql.NVarChar(50),
-            modality.trim()
-          )
-          .input(
-            "bodyPart",
-            sql.NVarChar(100),
-            bodyPart.trim()
-          )
-          .input(
-            "studyDate",
-            sql.Date,
-            studyDate
-          )
-          .input(
-            "status",
-            sql.NVarChar(50),
-            status ||
-              "Completed"
-          )
-          .query(`
-            UPDATE dbo.Studies
-            SET
-              PatientId =
-                @patientId,
-              StudyId =
-                @studyId,
-              Modality =
-                @modality,
-              BodyPart =
-                @bodyPart,
-              StudyDate =
-                @studyDate,
-              Status =
-                @status
-            OUTPUT
-              INSERTED.Id AS id,
-              INSERTED.StudyId AS studyId,
-              INSERTED.PatientId AS patientId,
-              INSERTED.Modality AS modality,
-              INSERTED.BodyPart AS bodyPart,
-              INSERTED.StudyDate AS studyDate,
-              INSERTED.Status AS status,
-              INSERTED.CreatedAt AS createdAt
 
-            WHERE Id =
-              @id
+/* =========================
+   GET STUDIES
+========================= */
 
-            AND UserId =
-              @userId
-          `);
-      if (
-        result.recordset.length === 0
-      ) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Study not found or you do not have permission to update it",
-        });
-      }
-      res.status(200).json({
-        success: true,
-        message:
-          "Study updated successfully",
-        study:
-          result.recordset[0],
-      });
-    } catch (error) {
-      console.log(
-        "Update Study Error"
-      );
-      console.log(error);
-      res.status(500).json({
-        success: false,
-        message:
-          "Unable to update study",
-      });
-    }
-  }
-);
-app.delete(
-  "/api/studies/:id",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      const studyDatabaseId =
-        Number(
-          req.params.id
-        );
-      if (
-        !userId ||
-        !studyDatabaseId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "User ID and Study ID are required",
-        });
-      }
-      await pool
-        .request()
-        .input(
-          "studyId",
-          sql.Int,
-          studyDatabaseId
-        )
-        .input(
-          "userId",
-          sql.Int,
-          userId
-        )
-        .query(`
-          DELETE FROM dbo.PatientImages
-          WHERE StudyId =
-            @studyId
-          AND UserId =
-            @userId
-        `);
-      await pool
-        .request()
-        .input(
-          "studyId",
-          sql.Int,
-          studyDatabaseId
-        )
-        .input(
-          "userId",
-          sql.Int,
-          userId
-        )
-        .query(`
-          DELETE FROM dbo.Reports
-          WHERE StudyId =
-            @studyId
-          AND UserId =
-            @userId
-        `);
-      const result =
-        await pool
-          .request()
-          .input(
-            "id",
-            sql.Int,
-            studyDatabaseId
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            DELETE FROM dbo.Studies
-            WHERE Id =
-              @id
-            AND UserId =
-              @userId
-          `);
-      if (
-        result.rowsAffected[0] === 0
-      ) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Study not found or you do not have permission to delete it",
-        });
-      }
-      res.status(200).json({
-        success: true,
-        message:
-          "Study deleted successfully",
-      });
-    } catch (error) {
-      console.log(
-        "Delete Study Error"
-      );
-      console.log(error);
-      res.status(500).json({
-        success: false,
-        message:
-          "Unable to delete study",
-      });
-    }
-  }
-);
 app.get(
-  "/api/images",
+  "/api/studies",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const patientId =
         req.query.patientId
           ? Number(
               req.query.patientId
             )
           : null;
-      const studyId =
-        req.query.studyId
-          ? Number(
-              req.query.studyId
-            )
-          : null;
+
+
       if (!userId) {
         return res.status(401).json({
           success: false,
@@ -1941,18 +2507,59 @@ app.get(
             "User ID is required",
         });
       }
+
+
       let query = `
         SELECT
-          pi.Id AS id,
-          pi.PatientId AS patientId,
-          pi.StudyId AS studyId,
-          pi.FileName AS fileName,
-          pi.ContentType AS contentType,
-          pi.CreatedAt AS createdAt
-        FROM dbo.PatientImages pi
-        WHERE pi.UserId =
+          s.Id AS id,
+
+          s.UserId AS userId,
+
+          s.PatientId AS patientId,
+
+          s.StudyId AS studyId,
+
+          s.BodyPart AS bodyPart,
+
+          s.StudyDate AS studyDate,
+
+          s.StudyDescription
+            AS studyDescription,
+
+          s.Modality AS modality,
+
+          s.CreatedAt AS createdAt,
+
+          (
+            SELECT COUNT(DISTINCT pi.Id)
+            FROM dbo.PatientImages pi
+            WHERE (
+              pi.StudyId =
+                s.Id
+              OR EXISTS (
+                SELECT 1
+                FROM dbo.Series sr
+                WHERE sr.Id =
+                  pi.SeriesId
+                AND sr.StudyId =
+                  s.Id
+              )
+            )
+          ) AS imageCount,
+
+          p.Name AS patientName
+
+        FROM dbo.Studies s
+
+        LEFT JOIN dbo.Patients p
+          ON p.Id =
+            s.PatientId
+
+        WHERE s.UserId =
           @userId
       `;
+
+
       const request =
         pool
           .request()
@@ -1961,94 +2568,97 @@ app.get(
             sql.Int,
             userId
           );
-      if (patientId) {
+
+
+      if (
+        patientId
+      ) {
         query += `
-          AND pi.PatientId =
+          AND s.PatientId =
             @patientId
         `;
+
         request.input(
           "patientId",
           sql.Int,
           patientId
         );
       }
-      if (studyId) {
-        query += `
-          AND pi.StudyId =
-            @studyId
-        `;
-        request.input(
-          "studyId",
-          sql.Int,
-          studyId
-        );
-      }
+
+
       query += `
-        ORDER BY pi.Id DESC
+        ORDER BY
+          s.StudyDate DESC,
+          s.Id DESC
       `;
+
+
       const result =
         await request.query(
           query
         );
+
+
       res.status(200).json({
         success: true,
-        images:
+
+        studies:
           result.recordset,
       });
     } catch (error) {
       console.log(
-        "Get Images Error"
+        "Get Studies Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
-          "Unable to get images",
+          "Unable to get studies",
       });
     }
   }
 );
-app.post(
-  "/api/images/upload",
-  upload.single("image"),
+
+
+/* =========================
+   GET SINGLE STUDY
+========================= */
+
+app.get(
+  "/api/studies/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
-      const patientId =
-        Number(
-          req.body.patientId
-        );
+
+
       const studyId =
-        req.body.studyId
-          ? Number(
-              req.body.studyId
-            )
-          : null;
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "User ID is required",
-        });
-      }
+        Number(
+          req.params.id
+        );
+
+
       if (
-        !patientId ||
-        !req.file
+        !userId ||
+        !studyId
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "Patient ID and image are required",
+            "User ID and Study ID are required",
         });
       }
-      const patientResult =
+
+
+      const result =
         await pool
           .request()
           .input(
-            "patientId",
+            "studyId",
             sql.Int,
-            patientId
+            studyId
           )
           .input(
             "userId",
@@ -2056,36 +2666,353 @@ app.post(
             userId
           )
           .query(`
-            SELECT Id
-            FROM dbo.Patients
+            SELECT
+              s.Id AS id,
+
+              s.UserId AS userId,
+
+              s.PatientId AS patientId,
+
+              s.StudyId AS studyId,
+
+              s.BodyPart AS bodyPart,
+
+              s.StudyDate AS studyDate,
+
+              s.StudyDescription
+                AS studyDescription,
+
+              s.Modality AS modality,
+
+              s.CreatedAt AS createdAt,
+
+              p.Name AS patientName
+
+            FROM dbo.Studies s
+
+            LEFT JOIN dbo.Patients p
+              ON p.Id =
+                s.PatientId
+
+            WHERE s.Id =
+              @studyId
+
+            AND s.UserId =
+              @userId
+          `);
+
+
+      if (
+        result.recordset.length ===
+        0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Study not found",
+        });
+      }
+
+
+      res.status(200).json({
+        success: true,
+
+        study:
+          result.recordset[0],
+      });
+    } catch (error) {
+      console.log(
+        "Get Study Error"
+      );
+
+      console.log(error);
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to get study",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   UPDATE STUDY
+========================= */
+
+app.put(
+  "/api/studies/:id",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const studyId =
+        Number(
+          req.params.id
+        );
+
+
+      const {
+        studyId: studyIdText,
+        bodyPart,
+        studyDate,
+        studyDescription,
+        modality,
+      } = req.body;
+
+
+      if (
+        !userId ||
+        !studyId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "User ID and Study ID are required",
+        });
+      }
+
+
+      const result =
+        await pool
+          .request()
+          .input(
+            "studyId",
+            sql.Int,
+            studyId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .input(
+            "studyIdText",
+            sql.NVarChar(100),
+            studyIdText
+              ? String(studyIdText).trim()
+              : null
+          )
+          .input(
+            "bodyPart",
+            sql.NVarChar(100),
+            bodyPart
+              ? String(bodyPart).trim()
+              : null
+          )
+          .input(
+            "studyDate",
+            sql.DateTime,
+            studyDate
+              ? new Date(
+                  studyDate
+                )
+              : null
+          )
+          .input(
+            "studyDescription",
+            sql.NVarChar(200),
+            studyDescription
+              ? studyDescription.trim()
+              : null
+          )
+          .input(
+            "modality",
+            sql.NVarChar(50),
+            modality
+              ? modality.trim()
+              : null
+          )
+          .query(`
+            UPDATE dbo.Studies
+
+            SET
+              StudyId =
+                @studyIdText,
+
+              BodyPart =
+                @bodyPart,
+
+              StudyDate =
+                @studyDate,
+
+              StudyDescription =
+                @studyDescription,
+
+              Modality =
+                @modality
+
+            OUTPUT
+              INSERTED.Id AS id,
+
+              INSERTED.UserId AS userId,
+
+              INSERTED.PatientId
+                AS patientId,
+
+              INSERTED.StudyId
+                AS studyId,
+
+              INSERTED.BodyPart
+                AS bodyPart,
+
+              INSERTED.StudyDate
+                AS studyDate,
+
+              INSERTED.StudyDescription
+                AS studyDescription,
+
+              INSERTED.Modality
+                AS modality,
+
+              INSERTED.CreatedAt
+                AS createdAt
+
             WHERE Id =
-              @patientId
+              @studyId
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        patientResult.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
-        return res.status(403).json({
+        return res.status(404).json({
           success: false,
           message:
-            "You do not have permission to upload an image for this patient",
+            "Study not found",
         });
-
       }
-      if (studyId) {
-        const studyResult =
-          await pool
-            .request()
+
+
+      res.status(200).json({
+        success: true,
+
+        message:
+          "Study updated successfully",
+
+        study:
+          result.recordset[0],
+      });
+    } catch (error) {
+      console.log(
+        "Update Study Error"
+      );
+
+      console.log(error);
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to update study",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   DELETE STUDY
+========================= */
+
+app.delete(
+  "/api/studies/:id",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const studyId =
+        Number(
+          req.params.id
+        );
+
+
+      if (
+        !userId ||
+        !studyId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "User ID and Study ID are required",
+        });
+      }
+
+
+      const transaction =
+        new sql.Transaction(
+          pool
+        );
+
+
+      await transaction.begin();
+
+
+      try {
+        await new sql.Request(
+          transaction
+        )
+          .input(
+            "studyId",
+            sql.Int,
+            studyId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            DELETE FROM dbo.PatientImages
+
+            WHERE StudyId =
+              @studyId
+
+            AND UserId =
+              @userId
+          `);
+
+
+        await new sql.Request(
+          transaction
+        )
+          .input(
+            "studyId",
+            sql.Int,
+            studyId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            DELETE FROM dbo.Series
+
+            WHERE StudyId =
+              @studyId
+
+            AND UserId =
+              @userId
+          `);
+
+
+        const result =
+          await new sql.Request(
+            transaction
+          )
             .input(
               "studyId",
               sql.Int,
               studyId
-            )
-            .input(
-              "patientId",
-              sql.Int,
-              patientId
             )
             .input(
               "userId",
@@ -2093,133 +3020,126 @@ app.post(
               userId
             )
             .query(`
-              SELECT Id
-              FROM dbo.Studies
+              DELETE FROM dbo.Studies
+
               WHERE Id =
                 @studyId
-              AND PatientId =
-                @patientId
+
               AND UserId =
                 @userId
             `);
+
+
         if (
-          studyResult.recordset
-            .length === 0
+          result.rowsAffected[0] ===
+          0
         ) {
-          return res.status(403).json({
+          await transaction.rollback();
+
+          return res.status(404).json({
             success: false,
             message:
-              "Invalid study or you do not have permission to use this study",
+              "Study not found",
           });
         }
+
+
+        await transaction.commit();
+
+
+        res.status(200).json({
+          success: true,
+
+          message:
+            "Study deleted successfully",
+        });
+      } catch (error) {
+        try {
+          await transaction.rollback();
+        } catch (
+          rollbackError
+        ) {
+          console.log(
+            rollbackError
+          );
+        }
+
+        throw error;
       }
-      const result =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .input(
-            "patientId",
-            sql.Int,
-            patientId
-          )
-          .input(
-            "studyId",
-            sql.Int,
-            studyId
-          )
-          .input(
-            "fileName",
-            sql.NVarChar(255),
-            req.file.originalname
-          )
-          .input(
-            "contentType",
-            sql.NVarChar(100),
-            req.file.mimetype
-          )
-          .input(
-            "imageData",
-            sql.VarBinary(sql.MAX),
-            req.file.buffer
-          )
-          .query(`
-            INSERT INTO dbo.PatientImages
-            (
-              UserId,
-              PatientId,
-              StudyId,
-              FileName,
-              ContentType,
-              ImageData
-            )
-            OUTPUT
-              INSERTED.Id AS id,
-              INSERTED.PatientId AS patientId,
-              INSERTED.StudyId AS studyId,
-              INSERTED.FileName AS fileName,
-              INSERTED.ContentType AS contentType,
-              INSERTED.CreatedAt AS createdAt
-            VALUES
-            (
-              @userId,
-              @patientId,
-              @studyId,
-              @fileName,
-              @contentType,
-              @imageData
-            )
-          `);
-      res.status(201).json({
-        success: true,
-        message:
-          "Image uploaded successfully",
-        image:
-          result.recordset[0],
-      });
     } catch (error) {
       console.log(
-        "Upload Image Error"
+        "Delete Study Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
-          "Unable to upload image",
+          "Unable to delete study",
       });
     }
   }
 );
-app.get(
-  "/api/images/:id",
+
+
+/* =========================
+   CREATE SERIES
+========================= */
+
+app.post(
+  "/api/series",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
-      const imageId =
+
+
+      const {
+        patientId,
+        studyId,
+        seriesNumber,
+        seriesDescription,
+        modality,
+      } = req.body;
+
+
+      const numericPatientId =
         Number(
-          req.params.id
+          patientId
         );
+
+      const numericStudyId =
+        Number(
+          studyId
+        );
+
+
       if (
         !userId ||
-        !imageId
+        !numericPatientId ||
+        !numericStudyId
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "User ID and Image ID are required",
+            "User ID, Patient ID and Study ID are required",
         });
       }
-      const result =
+
+
+      const studyResult =
         await pool
           .request()
           .input(
-            "id",
+            "studyId",
             sql.Int,
-            imageId
+            numericStudyId
+          )
+          .input(
+            "patientId",
+            sql.Int,
+            numericPatientId
           )
           .input(
             "userId",
@@ -2229,56 +3149,1252 @@ app.get(
           .query(`
             SELECT
               Id,
-              FileName,
-              ContentType,
-              ImageData
-            FROM dbo.PatientImages
+              Modality
+
+            FROM dbo.Studies
+
             WHERE Id =
-              @id
+              @studyId
+
+            AND PatientId =
+              @patientId
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.recordset.length === 0
+        studyResult.recordset.length ===
+        0
       ) {
-        return res.status(404).json({
+        return res.status(403).json({
           success: false,
           message:
-            "Image not found",
+            "Invalid study or permission denied",
         });
       }
-      const image =
-        result.recordset[0];
-      res.setHeader(
-        "Content-Type",
-        image.ContentType
-      );
-      res.send(
-        image.ImageData
-      );
+
+
+      let finalSeriesNumber =
+        Number(
+          seriesNumber
+        );
+
+
+      if (
+        !Number.isInteger(
+          finalSeriesNumber
+        ) ||
+        finalSeriesNumber <= 0
+      ) {
+        const nextResult =
+          await pool
+            .request()
+            .input(
+              "studyId",
+              sql.Int,
+              numericStudyId
+            )
+            .input(
+              "patientId",
+              sql.Int,
+              numericPatientId
+            )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .query(`
+              SELECT
+                ISNULL(
+                  MAX(SeriesNumber),
+                  0
+                ) + 1
+                  AS nextSeriesNumber
+
+              FROM dbo.Series
+
+              WHERE StudyId =
+                @studyId
+
+              AND PatientId =
+                @patientId
+
+              AND UserId =
+                @userId
+            `);
+
+
+        finalSeriesNumber =
+          Number(
+            nextResult
+              .recordset[0]
+              .nextSeriesNumber
+          );
+      }
+
+
+      const finalModality =
+        modality ||
+        studyResult
+          .recordset[0]
+          .Modality ||
+        null;
+
+
+      const finalDescription =
+        seriesDescription &&
+        String(
+          seriesDescription
+        ).trim()
+          ? String(
+              seriesDescription
+            ).trim()
+          : `Series ${finalSeriesNumber}`;
+
+
+      const result =
+        await pool
+          .request()
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .input(
+            "patientId",
+            sql.Int,
+            numericPatientId
+          )
+          .input(
+            "studyId",
+            sql.Int,
+            numericStudyId
+          )
+          .input(
+            "seriesNumber",
+            sql.Int,
+            finalSeriesNumber
+          )
+          .input(
+            "seriesDescription",
+            sql.NVarChar(200),
+            finalDescription
+          )
+          .input(
+            "modality",
+            sql.NVarChar(50),
+            finalModality
+          )
+          .query(`
+            INSERT INTO dbo.Series
+            (
+              UserId,
+              PatientId,
+              StudyId,
+              SeriesNumber,
+              SeriesDescription,
+              Modality
+            )
+
+            OUTPUT
+              INSERTED.Id AS id,
+
+              INSERTED.UserId AS userId,
+
+              INSERTED.PatientId
+                AS patientId,
+
+              INSERTED.StudyId
+                AS studyId,
+
+              INSERTED.SeriesNumber
+                AS seriesNumber,
+
+              INSERTED.SeriesDescription
+                AS seriesDescription,
+
+              INSERTED.Modality
+                AS modality,
+
+              INSERTED.CreatedAt
+                AS createdAt
+
+            VALUES
+            (
+              @userId,
+              @patientId,
+              @studyId,
+              @seriesNumber,
+              @seriesDescription,
+              @modality
+            )
+          `);
+
+
+      res.status(201).json({
+        success: true,
+
+        message:
+          "Series created successfully",
+
+        series:
+          result.recordset[0],
+      });
     } catch (error) {
       console.log(
-        "View Image Error"
+        "Create Series Error"
       );
+
       console.log(error);
+
       res.status(500).json({
         success: false,
         message:
-          "Unable to view image",
+          error.message ||
+          "Unable to create series",
       });
     }
   }
 );
-app.delete(
+
+
+/* =========================
+   GET SERIES
+========================= */
+
+app.get(
+  "/api/series",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const patientId =
+        req.query.patientId
+          ? Number(
+              req.query.patientId
+            )
+          : null;
+
+
+      const studyId =
+        req.query.studyId
+          ? Number(
+              req.query.studyId
+            )
+          : null;
+
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "User ID is required",
+        });
+      }
+
+
+      let query = `
+        SELECT
+          sr.Id AS id,
+
+          sr.UserId AS userId,
+
+          sr.PatientId AS patientId,
+
+          sr.StudyId AS studyId,
+
+          sr.SeriesNumber
+            AS seriesNumber,
+
+          sr.SeriesDescription
+            AS seriesDescription,
+
+          sr.Modality
+            AS modality,
+
+          sr.CreatedAt
+            AS createdAt,
+
+          COUNT(pi.Id)
+            AS imageCount,
+
+          (
+            SELECT TOP 1
+              pi2.Id
+
+            FROM dbo.PatientImages pi2
+
+            WHERE pi2.SeriesId =
+              sr.Id
+
+            ORDER BY
+              ISNULL(
+                pi2.ImageOrder,
+                2147483647
+              ) ASC,
+
+              pi2.Id ASC
+          ) AS firstImageId
+
+        FROM dbo.Series sr
+
+        LEFT JOIN dbo.PatientImages pi
+          ON pi.SeriesId =
+            sr.Id
+
+        WHERE sr.UserId =
+          @userId
+      `;
+
+
+      const request =
+        pool
+          .request()
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          );
+
+
+      if (
+        patientId
+      ) {
+        query += `
+          AND sr.PatientId =
+            @patientId
+        `;
+
+        request.input(
+          "patientId",
+          sql.Int,
+          patientId
+        );
+      }
+
+
+      if (
+        studyId
+      ) {
+        query += `
+          AND sr.StudyId =
+            @studyId
+        `;
+
+        request.input(
+          "studyId",
+          sql.Int,
+          studyId
+        );
+      }
+
+
+      query += `
+        GROUP BY
+          sr.Id,
+          sr.UserId,
+          sr.PatientId,
+          sr.StudyId,
+          sr.SeriesNumber,
+          sr.SeriesDescription,
+          sr.Modality,
+          sr.CreatedAt
+
+        ORDER BY
+          sr.SeriesNumber ASC,
+          sr.Id ASC
+      `;
+
+
+      const result =
+        await request.query(
+          query
+        );
+
+
+      res.status(200).json({
+        success: true,
+
+        series:
+          result.recordset,
+      });
+    } catch (error) {
+      console.log(
+        "Get Series Error"
+      );
+
+      console.log(error);
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to get series",
+      });
+    }
+  }
+);
+/* =========================
+   UPLOAD SERIES
+   MAX 500 IMAGES
+========================= */
+
+app.post(
+  "/api/series/upload",
+  upload.array(
+    "images",
+    500
+  ),
+  async (req, res) => {
+    let transaction;
+
+    try {
+      const userId =
+        getUserId(req);
+
+      const patientId =
+        Number(
+          req.body.patientId
+        );
+
+      const studyId =
+        Number(
+          req.body.studyId
+        );
+
+      const requestedSeriesId =
+        req.body.seriesId
+          ? Number(
+              req.body.seriesId
+            )
+          : null;
+
+      const files =
+        req.files || [];
+
+
+      /* =========================
+         VALIDATION
+      ========================= */
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "User ID is required",
+        });
+      }
+
+
+      if (
+        !patientId ||
+        !studyId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Patient ID and Study ID are required",
+        });
+      }
+
+
+      if (
+        !Number.isInteger(
+          patientId
+        ) ||
+        !Number.isInteger(
+          studyId
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Patient ID and Study ID must be valid numbers",
+        });
+      }
+
+
+      if (
+        files.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please select at least one image",
+        });
+      }
+
+
+      if (
+        files.length > 500
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "A series can contain a maximum of 500 images",
+        });
+      }
+
+
+      /* =========================
+         VERIFY PATIENT
+      ========================= */
+
+      const patientResult =
+        await pool
+          .request()
+          .input(
+            "patientId",
+            sql.Int,
+            patientId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            SELECT
+              Id
+
+            FROM dbo.Patients
+
+            WHERE Id =
+              @patientId
+
+            AND UserId =
+              @userId
+          `);
+
+
+      if (
+        patientResult.recordset.length ===
+        0
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You do not have permission to use this patient",
+        });
+      }
+
+
+      /* =========================
+         VERIFY STUDY
+      ========================= */
+
+      const studyResult =
+        await pool
+          .request()
+          .input(
+            "studyId",
+            sql.Int,
+            studyId
+          )
+          .input(
+            "patientId",
+            sql.Int,
+            patientId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            SELECT
+              Id,
+              Modality
+
+            FROM dbo.Studies
+
+            WHERE Id =
+              @studyId
+
+            AND PatientId =
+              @patientId
+
+            AND UserId =
+              @userId
+          `);
+
+
+      if (
+        studyResult.recordset.length ===
+        0
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Invalid study or you do not have permission to use this study",
+        });
+      }
+
+
+      /* =========================
+         START TRANSACTION
+      ========================= */
+
+      transaction =
+        new sql.Transaction(
+          pool
+        );
+
+      await transaction.begin();
+
+
+      let seriesId =
+        requestedSeriesId;
+
+
+      /* =========================
+         USE EXISTING SERIES
+      ========================= */
+
+      if (
+        seriesId
+      ) {
+        if (
+          !Number.isInteger(
+            seriesId
+          ) ||
+          seriesId <= 0
+        ) {
+          await transaction.rollback();
+
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid Series ID",
+          });
+        }
+
+
+        const seriesResult =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "seriesId",
+              sql.Int,
+              seriesId
+            )
+            .input(
+              "patientId",
+              sql.Int,
+              patientId
+            )
+            .input(
+              "studyId",
+              sql.Int,
+              studyId
+            )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .query(`
+              SELECT
+                Id
+
+              FROM dbo.Series
+
+              WHERE Id =
+                @seriesId
+
+              AND PatientId =
+                @patientId
+
+              AND StudyId =
+                @studyId
+
+              AND UserId =
+                @userId
+            `);
+
+
+        if (
+          seriesResult.recordset.length ===
+          0
+        ) {
+          await transaction.rollback();
+
+          return res.status(404).json({
+            success: false,
+            message:
+              "Series not found or you do not have permission to use it",
+          });
+        }
+      }
+
+
+      /* =========================
+         CREATE NEW SERIES
+      ========================= */
+
+      else {
+        const nextSeriesResult =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "patientId",
+              sql.Int,
+              patientId
+            )
+            .input(
+              "studyId",
+              sql.Int,
+              studyId
+            )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .query(`
+              SELECT
+                ISNULL(
+                  MAX(SeriesNumber),
+                  0
+                ) + 1
+                  AS nextSeriesNumber
+
+              FROM dbo.Series
+
+              WHERE PatientId =
+                @patientId
+
+              AND StudyId =
+                @studyId
+
+              AND UserId =
+                @userId
+            `);
+
+
+        const seriesNumber =
+          Number(
+            nextSeriesResult
+              .recordset[0]
+              .nextSeriesNumber
+          );
+
+
+        const studyModality =
+          studyResult
+            .recordset[0]
+            .Modality ||
+          null;
+
+
+        const createdSeries =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .input(
+              "patientId",
+              sql.Int,
+              patientId
+            )
+            .input(
+              "studyId",
+              sql.Int,
+              studyId
+            )
+            .input(
+              "seriesNumber",
+              sql.Int,
+              seriesNumber
+            )
+            .input(
+              "seriesDescription",
+              sql.NVarChar(200),
+              `Series ${seriesNumber}`
+            )
+            .input(
+              "modality",
+              sql.NVarChar(50),
+              studyModality
+            )
+            .query(`
+              INSERT INTO dbo.Series
+              (
+                UserId,
+                PatientId,
+                StudyId,
+                SeriesNumber,
+                SeriesDescription,
+                Modality
+              )
+
+              OUTPUT
+                INSERTED.Id AS id,
+
+                INSERTED.SeriesNumber
+                  AS seriesNumber
+
+              VALUES
+              (
+                @userId,
+                @patientId,
+                @studyId,
+                @seriesNumber,
+                @seriesDescription,
+                @modality
+              )
+            `);
+
+
+        seriesId =
+          createdSeries
+            .recordset[0]
+            .id;
+      }
+
+
+      /* =========================
+         FIND LAST IMAGE ORDER
+      ========================= */
+
+      const startOrderResult =
+        await new sql.Request(
+          transaction
+        )
+          .input(
+            "seriesId",
+            sql.Int,
+            seriesId
+          )
+          .query(`
+            SELECT
+              ISNULL(
+                MAX(ImageOrder),
+                0
+              ) AS lastOrder
+
+            FROM dbo.PatientImages
+
+            WHERE SeriesId =
+              @seriesId
+          `);
+
+
+      const startOrder =
+        Number(
+          startOrderResult
+            .recordset[0]
+            .lastOrder || 0
+        );
+
+
+      /* =========================
+         UPLOAD IMAGES
+      ========================= */
+
+      const uploadedImages =
+        [];
+
+
+      for (
+        let index = 0;
+        index <
+        files.length;
+        index++
+      ) {
+        const file =
+          files[index];
+
+
+        const imageOrder =
+          startOrder +
+          index +
+          1;
+
+
+        const insertResult =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .input(
+              "patientId",
+              sql.Int,
+              patientId
+            )
+            .input(
+              "studyId",
+              sql.Int,
+              studyId
+            )
+            .input(
+              "seriesId",
+              sql.Int,
+              seriesId
+            )
+            .input(
+              "imageOrder",
+              sql.Int,
+              imageOrder
+            )
+            .input(
+              "fileName",
+              sql.NVarChar(255),
+              file.originalname
+            )
+            .input(
+              "contentType",
+              sql.NVarChar(100),
+              file.mimetype ||
+                "application/octet-stream"
+            )
+            .input(
+              "imageData",
+              sql.VarBinary(
+                sql.MAX
+              ),
+              file.buffer
+            )
+            .query(`
+              INSERT INTO
+                dbo.PatientImages
+              (
+                UserId,
+                PatientId,
+                StudyId,
+                SeriesId,
+                ImageOrder,
+                FileName,
+                ContentType,
+                ImageData
+              )
+
+              OUTPUT
+                INSERTED.Id AS id,
+
+                INSERTED.PatientId
+                  AS patientId,
+
+                INSERTED.StudyId
+                  AS studyId,
+
+                INSERTED.SeriesId
+                  AS seriesId,
+
+                INSERTED.ImageOrder
+                  AS imageOrder,
+
+                INSERTED.FileName
+                  AS fileName,
+
+                INSERTED.ContentType
+                  AS contentType,
+
+                INSERTED.CreatedAt
+                  AS createdAt
+
+              VALUES
+              (
+                @userId,
+                @patientId,
+                @studyId,
+                @seriesId,
+                @imageOrder,
+                @fileName,
+                @contentType,
+                @imageData
+              )
+            `);
+
+
+        uploadedImages.push(
+          insertResult
+            .recordset[0]
+        );
+      }
+
+
+      /* =========================
+         COMMIT
+      ========================= */
+
+      await transaction.commit();
+
+      transaction =
+        null;
+
+
+      res.status(201).json({
+        success: true,
+
+        message:
+          `${uploadedImages.length} image(s) uploaded successfully`,
+
+        seriesId:
+          seriesId,
+
+        count:
+          uploadedImages.length,
+
+        images:
+          uploadedImages,
+      });
+    } catch (error) {
+      /* =========================
+         ROLLBACK
+      ========================= */
+
+      if (
+        transaction
+      ) {
+        try {
+          await transaction.rollback();
+        } catch (
+          rollbackError
+        ) {
+          console.log(
+            "Series Upload Rollback Error"
+          );
+
+          console.log(
+            rollbackError
+          );
+        }
+      }
+
+
+      console.log(
+        "Series Upload Error"
+      );
+
+      console.log(
+        error
+      );
+
+
+      res.status(500).json({
+        success: false,
+
+        message:
+          error.message ||
+          "Unable to upload image series",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   GET IMAGES
+========================= */
+
+app.get(
+  "/api/images",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const patientId =
+        req.query.patientId
+          ? Number(
+              req.query.patientId
+            )
+          : null;
+
+
+      const studyId =
+        req.query.studyId
+          ? Number(
+              req.query.studyId
+            )
+          : null;
+
+
+      const seriesId =
+        req.query.seriesId
+          ? Number(
+              req.query.seriesId
+            )
+          : null;
+
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "User ID is required",
+        });
+      }
+
+
+      let query = `
+        SELECT
+
+          pi.Id AS id,
+
+          pi.PatientId
+            AS patientId,
+
+          pi.StudyId
+            AS studyId,
+
+          pi.SeriesId
+            AS seriesId,
+
+          pi.ImageOrder
+            AS imageOrder,
+
+          pi.FileName
+            AS fileName,
+
+          pi.ContentType
+            AS contentType,
+
+          pi.CreatedAt
+            AS createdAt
+
+        FROM dbo.PatientImages pi
+
+        WHERE pi.UserId =
+          @userId
+      `;
+
+
+      const request =
+        pool
+          .request()
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          );
+
+
+      if (
+        patientId
+      ) {
+        query += `
+          AND pi.PatientId =
+            @patientId
+        `;
+
+        request.input(
+          "patientId",
+          sql.Int,
+          patientId
+        );
+      }
+
+
+      if (
+        studyId
+      ) {
+        query += `
+          AND pi.StudyId =
+            @studyId
+        `;
+
+        request.input(
+          "studyId",
+          sql.Int,
+          studyId
+        );
+      }
+
+
+      if (
+        seriesId
+      ) {
+        query += `
+          AND pi.SeriesId =
+            @seriesId
+        `;
+
+        request.input(
+          "seriesId",
+          sql.Int,
+          seriesId
+        );
+      }
+
+
+      query += `
+        ORDER BY
+
+          ISNULL(
+            pi.ImageOrder,
+            2147483647
+          ) ASC,
+
+          pi.Id ASC
+      `;
+
+
+      const result =
+        await request.query(
+          query
+        );
+
+
+      res.status(200).json({
+        success: true,
+
+        images:
+          result.recordset,
+      });
+    } catch (error) {
+      console.log(
+        "Get Images Error"
+      );
+
+      console.log(
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to get images",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   GET IMAGE BY ID
+========================= */
+
+app.get(
   "/api/images/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const imageId =
         Number(
           req.params.id
         );
+
+
       if (
         !userId ||
         !imageId
@@ -2289,6 +4405,8 @@ app.delete(
             "User ID and Image ID are required",
         });
       }
+
+
       const result =
         await pool
           .request()
@@ -2303,14 +4421,167 @@ app.delete(
             userId
           )
           .query(`
-            DELETE FROM dbo.PatientImages
+            SELECT
+
+              Id AS id,
+
+              PatientId
+                AS patientId,
+
+              StudyId
+                AS studyId,
+
+              SeriesId
+                AS seriesId,
+
+              ImageOrder
+                AS imageOrder,
+
+              FileName
+                AS fileName,
+
+              ContentType
+                AS contentType,
+
+              ImageData
+                AS imageData,
+
+              CreatedAt
+                AS createdAt
+
+            FROM dbo.PatientImages
+
             WHERE Id =
-             @id
+              @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.rowsAffected[0] === 0
+        result.recordset.length ===
+        0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Image not found",
+        });
+      }
+
+
+      const image =
+        result.recordset[0];
+
+
+      const imageData =
+        image.imageData;
+
+
+      if (
+        !imageData
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Image data not found",
+        });
+      }
+
+
+      res.set(
+        "Cache-Control",
+        "private, max-age=3600"
+      );
+
+
+      res.type(
+        image.contentType ||
+        "application/octet-stream"
+      );
+
+
+      res.send(
+        imageData
+      );
+    } catch (error) {
+      console.log(
+        "Get Image Error"
+      );
+
+      console.log(
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to get image",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   DELETE IMAGE
+========================= */
+
+app.delete(
+  "/api/images/:id",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const imageId =
+        Number(
+          req.params.id
+        );
+
+
+      if (
+        !userId ||
+        !imageId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "User ID and image ID are required",
+        });
+      }
+
+
+      const result =
+        await pool
+          .request()
+          .input(
+            "id",
+            sql.Int,
+            imageId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            DELETE FROM
+              dbo.PatientImages
+
+            WHERE Id =
+              @id
+
+            AND UserId =
+              @userId
+          `);
+
+
+      if (
+        result.rowsAffected[0] ===
+        0
       ) {
         return res.status(404).json({
           success: false,
@@ -2318,8 +4589,11 @@ app.delete(
             "Image not found or you do not have permission to delete it",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Image deleted successfully",
       });
@@ -2327,7 +4601,11 @@ app.delete(
       console.log(
         "Delete Image Error"
       );
-      console.log(error);
+
+      console.log(
+        error
+      );
+
       res.status(500).json({
         success: false,
         message:
@@ -2336,12 +4614,228 @@ app.delete(
     }
   }
 );
+
+
+/* =========================
+   DELETE SERIES
+========================= */
+
+app.delete(
+  "/api/series/:id",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+
+      const seriesId =
+        Number(
+          req.params.id
+        );
+
+
+      if (
+        !userId ||
+        !seriesId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "User ID and Series ID are required",
+        });
+      }
+
+
+      const transaction =
+        new sql.Transaction(
+          pool
+        );
+
+
+      await transaction.begin();
+
+
+      try {
+        const seriesResult =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "seriesId",
+              sql.Int,
+              seriesId
+            )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .query(`
+              SELECT
+                Id
+
+              FROM dbo.Series
+
+              WHERE Id =
+                @seriesId
+
+              AND UserId =
+                @userId
+            `);
+
+
+        if (
+          seriesResult.recordset.length ===
+          0
+        ) {
+          await transaction.rollback();
+
+          return res.status(404).json({
+            success: false,
+            message:
+              "Series not found",
+          });
+        }
+
+
+        await new sql.Request(
+          transaction
+        )
+          .input(
+            "seriesId",
+            sql.Int,
+            seriesId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            DELETE FROM
+              dbo.PatientImages
+
+            WHERE SeriesId =
+              @seriesId
+
+            AND UserId =
+              @userId
+          `);
+
+
+        const deleteResult =
+          await new sql.Request(
+            transaction
+          )
+            .input(
+              "seriesId",
+              sql.Int,
+              seriesId
+            )
+            .input(
+              "userId",
+              sql.Int,
+              userId
+            )
+            .query(`
+              DELETE FROM
+                dbo.Series
+
+              WHERE Id =
+                @seriesId
+
+              AND UserId =
+                @userId
+            `);
+
+
+        if (
+          deleteResult.rowsAffected[0] ===
+          0
+        ) {
+          await transaction.rollback();
+
+          return res.status(404).json({
+            success: false,
+            message:
+              "Series not found",
+          });
+        }
+
+
+        await transaction.commit();
+
+
+        res.status(200).json({
+          success: true,
+
+          message:
+            "Series deleted successfully",
+        });
+      } catch (error) {
+        try {
+          await transaction.rollback();
+        } catch (
+          rollbackError
+        ) {
+          console.log(
+            "Series Delete Rollback Error"
+          );
+
+          console.log(
+            rollbackError
+          );
+        }
+
+        throw error;
+      }
+    } catch (error) {
+      console.log(
+        "Delete Series Error"
+      );
+
+      console.log(
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Unable to delete series",
+      });
+    }
+  }
+);
+
+
+/* =========================
+   REPORTS
+========================= */
+
 app.get(
   "/api/reports",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
+      const patientId =
+        req.query.patientId
+          ? Number(
+              req.query.patientId
+            )
+          : null;
+
+
+      const studyId =
+        req.query.studyId
+          ? Number(
+              req.query.studyId
+            )
+          : null;
+
+
       if (!userId) {
         return res.status(401).json({
           success: false,
@@ -2349,41 +4843,110 @@ app.get(
             "User ID is required",
         });
       }
-      const result =
-        await pool
+
+
+      let query = `
+        SELECT
+
+          r.Id AS id,
+
+          r.UserId AS userId,
+
+          r.PatientId
+            AS patientId,
+
+          r.StudyId
+            AS studyId,
+
+          r.RadiologistName
+            AS radiologistName,
+
+          r.Findings
+            AS findings,
+
+          r.Impression
+            AS impression,
+
+          r.Status
+            AS status,
+
+          r.ReportDate
+            AS reportDate,
+
+          r.CreatedAt
+            AS createdAt,
+
+          p.Name
+            AS patientName
+
+        FROM dbo.Reports r
+
+        LEFT JOIN dbo.Patients p
+          ON p.Id =
+            r.PatientId
+
+        WHERE r.UserId =
+          @userId
+      `;
+
+
+      const request =
+        pool
           .request()
           .input(
             "userId",
             sql.Int,
             userId
-          )
-          .query(`
-            SELECT
-              r.Id AS id,
-              r.PatientId AS patientId,
-              p.Name AS patientName,
-              r.StudyId AS studyId,
-              s.StudyId AS studyNumber,
-              r.RadiologistName
-                AS radiologistName,
-              r.Findings AS findings,
-              r.Impression AS impression,
-              r.Status AS status,
-              r.ReportDate AS reportDate,
-              r.CreatedAt AS createdAt
-            FROM dbo.Reports r
-            LEFT JOIN dbo.Patients p
-              ON p.Id =
-                r.PatientId
-            LEFT JOIN dbo.Studies s
-              ON s.Id =
-                r.StudyId
-            WHERE r.UserId =
-              @userId
-            ORDER BY r.Id DESC
-          `);
+          );
+
+
+      if (
+        patientId
+      ) {
+        query += `
+          AND r.PatientId =
+            @patientId
+        `;
+
+        request.input(
+          "patientId",
+          sql.Int,
+          patientId
+        );
+      }
+
+
+      if (
+        studyId
+      ) {
+        query += `
+          AND r.StudyId =
+            @studyId
+        `;
+
+        request.input(
+          "studyId",
+          sql.Int,
+          studyId
+        );
+      }
+
+
+      query += `
+        ORDER BY
+          r.Id DESC
+      `;
+
+
+      const result =
+        await request.query(
+          query
+        );
+
+
       res.status(200).json({
         success: true,
+
         reports:
           result.recordset,
       });
@@ -2391,7 +4954,11 @@ app.get(
       console.log(
         "Get Reports Error"
       );
-      console.log(error);
+
+      console.log(
+        error
+      );
+
       res.status(500).json({
         success: false,
         message:
@@ -2400,101 +4967,19 @@ app.get(
     }
   }
 );
-app.get(
-  "/api/reports/:id",
-  async (req, res) => {
-    try {
-      const userId =
-        getUserId(req);
-      const reportId =
-        Number(
-          req.params.id
-        );
-      if (
-        !userId ||
-        !reportId
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "User ID and Report ID are required",
-        });
 
-      }
-      const result =
-        await pool
-          .request()
-          .input(
-            "id",
-            sql.Int,
-            reportId
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT
-              r.Id AS id,
-              r.PatientId AS patientId,
-              p.Name AS patientName,
-              r.StudyId AS studyId,
-              s.StudyId AS studyNumber,
-              r.RadiologistName
-                AS radiologistName,
-              r.Findings AS findings,
-              r.Impression AS impression,
-              r.Status AS status,
-              r.ReportDate AS reports,
-              r.CreatedAt AS createdAt
-            FROM dbo.Reports r
-            LEFT JOIN dbo.Patients p
-              ON p.Id =
-                r.PatientId
-            LEFT JOIN dbo.Studies s
-              ON s.Id =
-                r.StudyId
-            WHERE r.Id =
-              @id
-            AND r.UserId =
-              @userId
-          `);
-      if (
-        result.recordset.length === 0
-      ) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Report not found",
-        });
-      }
-      res.status(200).json({
-        success: true,
-        report:
-          result.recordset[0],
-      });
-    } catch (error) {
-      console.log(
-        "Get Report Error"
-      );
-      console.log(error);
-      res.status(500).json({
-        success: false,
-        message:
-          "Unable to get report",
-      });
-    }
-  }
-);
+
+/* =========================
+   CREATE REPORT
+========================= */
+
 app.post(
   "/api/reports",
   async (req, res) => {
-
     try {
-
       const userId =
         getUserId(req);
+
 
       const {
         patientId,
@@ -2503,33 +4988,53 @@ app.post(
         findings,
         impression,
         status,
+        reportDate,
       } = req.body;
 
-      if (!userId) {
 
+      const numericPatientId =
+        patientId
+          ? Number(
+              patientId
+            )
+          : null;
+
+
+      const numericStudyId =
+        studyId
+          ? Number(
+              studyId
+            )
+          : null;
+
+
+      if (!userId) {
         return res.status(401).json({
           success: false,
           message:
             "User ID is required",
         });
-
       }
 
-      if (!patientId) {
 
+      if (
+        !numericPatientId
+      ) {
         return res.status(400).json({
           success: false,
           message:
             "Patient ID is required",
         });
       }
+
+
       const patientResult =
         await pool
           .request()
           .input(
             "patientId",
             sql.Int,
-            Number(patientId)
+            numericPatientId
           )
           .input(
             "userId",
@@ -2537,35 +5042,46 @@ app.post(
             userId
           )
           .query(`
-            SELECT Id
+            SELECT
+              Id
+
             FROM dbo.Patients
+
             WHERE Id =
               @patientId
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        patientResult.recordset.length === 0
+        patientResult.recordset.length ===
+        0
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "You do not have permission to create a report for this patient",
+            "Patient not found or access denied",
         });
       }
-      if (studyId) {
+
+
+      if (
+        numericStudyId
+      ) {
         const studyResult =
           await pool
             .request()
             .input(
               "studyId",
               sql.Int,
-              Number(studyId)
+              numericStudyId
             )
             .input(
               "patientId",
               sql.Int,
-              Number(patientId)
+              numericPatientId
             )
             .input(
               "userId",
@@ -2573,26 +5089,35 @@ app.post(
               userId
             )
             .query(`
-              SELECT Id
+              SELECT
+                Id
+
               FROM dbo.Studies
+
               WHERE Id =
                 @studyId
+
               AND PatientId =
-               @patientId
+                @patientId
+
               AND UserId =
                 @userId
             `);
+
+
         if (
-          studyResult.recordset
-            .length === 0
+          studyResult.recordset.length ===
+          0
         ) {
           return res.status(403).json({
             success: false,
             message:
-              "Invalid study or you do not have permission to use this study",
+              "Study not found or access denied",
           });
         }
       }
+
+
       const result =
         await pool
           .request()
@@ -2604,39 +5129,49 @@ app.post(
           .input(
             "patientId",
             sql.Int,
-            Number(patientId)
+            numericPatientId
           )
           .input(
             "studyId",
             sql.Int,
-            studyId
-              ? Number(studyId)
-              : null
+            numericStudyId
           )
           .input(
             "radiologistName",
             sql.NVarChar(150),
-            radiologistName ||
-              null
+            radiologistName
+              ? String(
+                  radiologistName
+                ).trim()
+              : null
           )
           .input(
             "findings",
             sql.NVarChar(sql.MAX),
-            findings ||
-              null
+            findings || null
           )
           .input(
             "impression",
             sql.NVarChar(sql.MAX),
-            impression ||
-              null
+            impression || null
           )
-
           .input(
             "status",
             sql.NVarChar(50),
-            status ||
-              "Completed"
+            status
+              ? String(
+                  status
+                ).trim()
+              : "Completed"
+          )
+          .input(
+            "reportDate",
+            sql.DateTime,
+            reportDate
+              ? new Date(
+                  reportDate
+                )
+              : new Date()
           )
           .query(`
             INSERT INTO dbo.Reports
@@ -2650,17 +5185,37 @@ app.post(
               Status,
               ReportDate
             )
+
             OUTPUT
+
               INSERTED.Id AS id,
-              INSERTED.PatientId AS patientId,
-              INSERTED.StudyId AS studyId,
+
+              INSERTED.UserId AS userId,
+
+              INSERTED.PatientId
+                AS patientId,
+
+              INSERTED.StudyId
+                AS studyId,
+
               INSERTED.RadiologistName
                 AS radiologistName,
-              INSERTED.Findings AS findings,
-              INSERTED.Impression AS impression,
-              INSERTED.Status AS status,
-              INSERTED.ReportDate AS reportDate,
-              INSERTED.CreatedAt AS createdAt
+
+              INSERTED.Findings
+                AS findings,
+
+              INSERTED.Impression
+                AS impression,
+
+              INSERTED.Status
+                AS status,
+
+              INSERTED.ReportDate
+                AS reportDate,
+
+              INSERTED.CreatedAt
+                AS createdAt
+
             VALUES
             (
               @userId,
@@ -2670,22 +5225,29 @@ app.post(
               @findings,
               @impression,
               @status,
-              GETDATE()
+              @reportDate
             )
           `);
+
+
       res.status(201).json({
         success: true,
+
         message:
           "Report created successfully",
+
         report:
           result.recordset[0],
-
       });
     } catch (error) {
       console.log(
         "Create Report Error"
       );
-      console.log(error);
+
+      console.log(
+        error
+      );
+
       res.status(500).json({
         success: false,
         message:
@@ -2694,24 +5256,35 @@ app.post(
     }
   }
 );
+
+
+/* =========================
+   UPDATE REPORT
+========================= */
+
 app.put(
   "/api/reports/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const reportId =
         Number(
           req.params.id
         );
+
+
       const {
-        patientId,
-        studyId,
         radiologistName,
         findings,
         impression,
         status,
+        reportDate,
       } = req.body;
+
+
       if (
         !userId ||
         !reportId
@@ -2721,85 +5294,9 @@ app.put(
           message:
             "User ID and Report ID are required",
         });
+      }
 
-      }
-      if (!patientId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Patient ID is required",
-        });
-      }
-      const patientResult =
-        await pool
-          .request()
-          .input(
-            "patientId",
-            sql.Int,
-            Number(patientId)
-          )
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT Id
-            FROM dbo.Patients
-            WHERE Id =
-              @patientId
-            AND UserId =
-              @userId
-          `);
-      if (
-        patientResult.recordset.length === 0
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You do not have permission to use this patient",
-        });
-      }
-      if (studyId) {
-        const studyResult =
-          await pool
-            .request()
-            .input(
-              "studyId",
-              sql.Int,
-              Number(studyId)
-            )
-            .input(
-              "patientId",
-              sql.Int,
-              Number(patientId)
-            )
-            .input(
-              "userId",
-              sql.Int,
-              userId
-            )
-            .query(`
-              SELECT Id
 
-              FROM dbo.Studies
-              WHERE Id =
-                @studyId
-              AND PatientId =
-                @patientId
-              AND UserId =
-                @userId
-            `);
-        if (
-          studyResult.recordset.length === 0
-        ) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "Invalid study or you do not have permission to use this study",
-          });
-       }
-      }
       const result =
         await pool
           .request()
@@ -2814,87 +5311,118 @@ app.put(
             userId
           )
           .input(
-            "patientId",
-            sql.Int,
-            Number(patientId)
-          )
-          .input(
-            "studyId",
-            sql.Int,
-            studyId
-              ? Number(studyId)
-              : null
-          )
-          .input(
             "radiologistName",
             sql.NVarChar(150),
-            radiologistName ||
-              null
+            radiologistName
+              ? String(
+                  radiologistName
+                ).trim()
+              : null
           )
           .input(
             "findings",
             sql.NVarChar(sql.MAX),
-            findings ||
-              null
+            findings || null
           )
           .input(
             "impression",
             sql.NVarChar(sql.MAX),
-            impression ||
-              null
+            impression || null
           )
           .input(
             "status",
             sql.NVarChar(50),
-            status ||
-              "Completed"
+            status
+              ? String(
+                  status
+                ).trim()
+              : "Completed"
+          )
+          .input(
+            "reportDate",
+            sql.DateTime,
+            reportDate
+              ? new Date(
+                  reportDate
+                )
+              : null
           )
           .query(`
             UPDATE dbo.Reports
+
             SET
-              PatientId =
-                @patientId,
-              StudyId =
-                @studyId,
+
               RadiologistName =
                 @radiologistName,
+
               Findings =
                 @findings,
+
               Impression =
                 @impression,
+
               Status =
                 @status,
+
               ReportDate =
-                GETDATE()
+                @reportDate
+
             OUTPUT
+
               INSERTED.Id AS id,
-              INSERTED.PatientId AS patientId,
-              INSERTED.StudyId AS studyId,
+
+              INSERTED.UserId AS userId,
+
+              INSERTED.PatientId
+                AS patientId,
+
+              INSERTED.StudyId
+                AS studyId,
+
               INSERTED.RadiologistName
                 AS radiologistName,
-              INSERTED.Findings AS findings,
-              INSERTED.Impression AS impression,
-              INSERTED.Status AS status,
-              INSERTED.ReportDate AS reportDate,
-              INSERTED.CreatedAt AS createdAt
+
+              INSERTED.Findings
+                AS findings,
+
+              INSERTED.Impression
+                AS impression,
+
+              INSERTED.Status
+                AS status,
+
+              INSERTED.ReportDate
+                AS reportDate,
+
+              INSERTED.CreatedAt
+                AS createdAt
+
             WHERE Id =
               @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.recordset.length === 0
+        result.recordset.length ===
+        0
       ) {
         return res.status(404).json({
           success: false,
           message:
-            "Report not found or you do not have permission to update it",
+            "Report not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Report updated successfully",
+
         report:
           result.recordset[0],
       });
@@ -2902,7 +5430,11 @@ app.put(
       console.log(
         "Update Report Error"
       );
-      console.log(error);
+
+      console.log(
+        error
+      );
+
       res.status(500).json({
         success: false,
         message:
@@ -2911,16 +5443,25 @@ app.put(
     }
   }
 );
+
+
+/* =========================
+   DELETE REPORT
+========================= */
+
 app.delete(
   "/api/reports/:id",
   async (req, res) => {
     try {
       const userId =
         getUserId(req);
+
+
       const reportId =
         Number(
           req.params.id
         );
+
 
       if (
         !userId ||
@@ -2931,8 +5472,9 @@ app.delete(
           message:
             "User ID and Report ID are required",
         });
-
       }
+
+
       const result =
         await pool
           .request()
@@ -2948,22 +5490,30 @@ app.delete(
           )
           .query(`
             DELETE FROM dbo.Reports
+
             WHERE Id =
               @id
+
             AND UserId =
               @userId
           `);
+
+
       if (
-        result.rowsAffected[0] === 0
+        result.rowsAffected[0] ===
+        0
       ) {
         return res.status(404).json({
           success: false,
           message:
-            "Report not found or you do not have permission to delete it",
+            "Report not found",
         });
       }
+
+
       res.status(200).json({
         success: true,
+
         message:
           "Report deleted successfully",
       });
@@ -2971,7 +5521,11 @@ app.delete(
       console.log(
         "Delete Report Error"
       );
-      console.log(error);
+
+      console.log(
+        error
+      );
+
       res.status(500).json({
         success: false,
         message:
@@ -2980,105 +5534,147 @@ app.delete(
     }
   }
 );
+
+
+/* =========================
+   HEALTH CHECK
+========================= */
+
 app.get(
-  "/api/dashboard",
+  "/api/health",
   async (req, res) => {
     try {
-      const userId =
-        getUserId(req);
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "User ID is required",
-        });
+      await pool
+        .request()
+        .query(
+          "SELECT 1 AS ok"
+        );
 
-      }
-      const patients =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT COUNT(*) AS count
-            FROM dbo.Patients
-            WHERE UserId =
-              @userId
-          `);
-      const studies =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT COUNT(*) AS count
-            FROM dbo.Studies
-            WHERE UserId =
-              @userId
-          `);
-      const images =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT COUNT(*) AS count
-            FROM dbo.PatientImages
-            WHERE UserId =
-              @userId
-          `);
-      const reports =
-        await pool
-          .request()
-          .input(
-            "userId",
-            sql.Int,
-            userId
-          )
-          .query(`
-            SELECT COUNT(*) AS count
-            FROM dbo.Reports
-            WHERE UserId =
-              @userId
-          `);
+
       res.status(200).json({
         success: true,
-        counts: {
-          patients:
-            patients.recordset[0].count,
-          studies:
-            studies.recordset[0].count,
-          images:
-            images.recordset[0].count,
-          reports:
-            reports.recordset[0].count,
-        },
+
+        message:
+          "Backend and database are working",
       });
     } catch (error) {
-      console.log(
-        "Dashboard Error"
-      );
-      console.log(error);
       res.status(500).json({
         success: false,
+
         message:
-          "Unable to load dashboard",
+          "Database connection failed",
       });
     }
   }
 );
+
+
+/* =========================
+   MULTER ERROR HANDLER
+========================= */
+
+app.use(
+  (
+    error,
+    req,
+    res,
+    next
+  ) => {
+    if (
+      error instanceof
+      multer.MulterError
+    ) {
+      let message =
+        "Unable to read the uploaded files";
+
+
+      if (
+        error.code ===
+        "LIMIT_FILE_SIZE"
+      ) {
+        message =
+          "Each image must be 100 MB or smaller";
+      }
+
+
+      if (
+        error.code ===
+          "LIMIT_FILE_COUNT" ||
+        error.code ===
+          "LIMIT_UNEXPECTED_FILE"
+      ) {
+        message =
+          "A series can contain a maximum of 500 images";
+      }
+
+
+      return res.status(400).json({
+        success: false,
+
+        message,
+      });
+    }
+
+
+    if (
+      error &&
+      error.message ===
+        "Unsupported file type"
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Unsupported file type. Please upload DICOM or supported image files.",
+      });
+    }
+
+
+    console.log(
+      "Unhandled Server Error"
+    );
+
+    console.log(
+      error
+    );
+
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        error &&
+        error.message
+          ? error.message
+          : "Internal server error",
+    });
+  }
+);
+
+
+/* =========================
+   404 HANDLER
+========================= */
+
+app.use(
+  (
+    req,
+    res
+  ) => {
+    res.status(404).json({
+      success: false,
+
+      message:
+        `Route not found: ${req.method} ${req.originalUrl}`,
+    });
+  }
+);
+
+
 const PORT = 5000;
 async function startServer() {
   await connectDatabase();
+
   app.listen(
     PORT,
     "0.0.0.0",
@@ -3086,10 +5682,12 @@ async function startServer() {
       console.log(
         `Server is running on port ${PORT}`
       );
+
       console.log(
-        `Backend: http://10.198.159.228:${PORT}`
+        `Backend: http://localhost:${PORT}`
       );
     }
   );
 }
+
 startServer();
