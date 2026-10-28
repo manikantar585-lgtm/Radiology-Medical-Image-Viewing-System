@@ -40,32 +40,53 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import PrintIcon from "@mui/icons-material/Print";
 import ImageIcon from "@mui/icons-material/Image";
 
+
 function Reports() {
-  const API_URL = "http://localhost:5000";
+  const API_URL =
+    "http://localhost:5000";
+
+
+  // =========================================================
+  // STATE
+  // =========================================================
+
   const [reports, setReports] =
     useState([]);
+
   const [studies, setStudies] =
     useState([]);
+
   const [search, setSearch] =
     useState("");
+
   const [loading, setLoading] =
     useState(true);
+
   const [saving, setSaving] =
     useState(false);
+
   const [deleting, setDeleting] =
     useState(false);
+
   const [openForm, setOpenForm] =
     useState(false);
+
   const [openView, setOpenView] =
     useState(false);
+
   const [editingReport, setEditingReport] =
     useState(null);
+
   const [selectedReport, setSelectedReport] =
     useState(null);
+
   const [reportImage, setReportImage] =
     useState(null);
+
   const [loadingReportImage, setLoadingReportImage] =
     useState(false);
+
+
   const [form, setForm] =
     useState({
       studyId: "",
@@ -74,341 +95,668 @@ function Reports() {
       impression: "",
       status: "Completed",
     });
-  const getLoggedInUser = useCallback(() => {
-    try {
-      const storedUser =
-        localStorage.getItem(
-          "loggedInUser"
+
+
+  // =========================================================
+  // USER
+  // =========================================================
+
+  const getLoggedInUser =
+    useCallback(() => {
+      try {
+        const storedUser =
+          localStorage.getItem(
+            "loggedInUser"
+          );
+
+        if (!storedUser) {
+          return null;
+        }
+
+        return JSON.parse(
+          storedUser
         );
-      if (!storedUser) {
+
+      } catch (error) {
+        console.error(
+          "Unable to read logged-in user:",
+          error
+        );
+
         return null;
       }
-      return JSON.parse(
-        storedUser
-      );
-    } catch (error) {
-      console.error(
-        "Unable to read user:",
-        error
-      );
-      return null;
-    }
-  }, []);
-  const getUserId = useCallback(() => {
-    const user =
-      getLoggedInUser();
-    if (!user || !user.id) {
-      return null;
-    }
-    return user.id;
-  }, [getLoggedInUser]);
-  const getUserHeaders = useCallback(() => {
-    const userId =
-      getUserId();
-    return {
-      "Content-Type":
-        "application/json",
-      "x-user-id":
-        String(userId),
-    };
-  }, [getUserId]);
-  const loadReports =
-    useCallback(async () => {
-      try {
-        const userId =
-          getUserId();
+    }, []);
 
-        if (!userId) {
-          alert(
-            "Your login session was not found. Please login again."
-         );
-          return;
-        }
-        const response =
-          await fetch(
-            `${API_URL}/api/reports`,
-            {
-              method: "GET",
-              headers:
-                getUserHeaders(),
-            }
-          );
-        const data =
-          await response.json();
-        if (!response.ok) {
-          alert(
-            data.message ||
-              "Unable to load reports"
-          );
-          return;
-        }
-        setReports(
-          data.reports || []
-        );
-      } catch (error) {
-        console.error(
-          "Load Reports Error:",
-          error
-        );
-        alert(
-          "Cannot connect to backend server."
-        );
+
+  const getUserId =
+    useCallback(() => {
+      const user =
+        getLoggedInUser();
+
+      if (
+        !user ||
+        !user.id
+      ) {
+        return null;
       }
-    }, [API_URL, getUserHeaders, getUserId]);
+
+      return user.id;
+    }, [
+      getLoggedInUser,
+    ]);
+
+
+  const getUserHeaders =
+    useCallback(() => {
+
+      const userId =
+        getUserId();
+
+      return {
+        "Content-Type":
+          "application/json",
+
+        "x-user-id":
+          String(
+            userId || ""
+          ),
+      };
+
+    }, [
+      getUserId,
+    ]);
+
+
+  // =========================================================
+  // LOAD REPORTS
+  // =========================================================
+
+  const loadReports =
+    useCallback(
+      async () => {
+
+        try {
+
+          const userId =
+            getUserId();
+
+          if (!userId) {
+
+            alert(
+              "Your login session was not found. Please login again."
+            );
+
+            return;
+          }
+
+
+          const response =
+            await fetch(
+              `${API_URL}/api/reports`,
+              {
+                method:
+                  "GET",
+
+                headers:
+                  getUserHeaders(),
+              }
+            );
+
+
+          const data =
+            await response.json();
+
+
+          if (
+            !response.ok
+          ) {
+
+            alert(
+              data.message ||
+                "Unable to load reports"
+            );
+
+            return;
+          }
+
+
+          setReports(
+            Array.isArray(
+              data.reports
+            )
+              ? data.reports
+              : []
+          );
+
+        } catch (error) {
+
+          console.error(
+            "Load Reports Error:",
+            error
+          );
+
+          alert(
+            "Cannot connect to backend server."
+          );
+        }
+
+      },
+      [
+        getUserId,
+        getUserHeaders,
+      ]
+    );
+
+
+  // =========================================================
+  // LOAD STUDIES
+  // =========================================================
+
   const loadStudies =
-    useCallback(async () => {
-      try {
-        const userId =
-          getUserId();
-        if (!userId) {
-          return;
-        }
-        const patientResponse =
-          await fetch(
-            `${API_URL}/api/patients`,
-            {
-              method: "GET",
-              headers:
-                getUserHeaders(),
-            }
+    useCallback(
+      async () => {
+
+        try {
+
+          const userId =
+            getUserId();
+
+          if (!userId) {
+            return;
+          }
+
+
+          // -------------------------------------------------
+          // PATIENTS
+          // -------------------------------------------------
+
+          const patientResponse =
+            await fetch(
+              `${API_URL}/api/patients`,
+              {
+                method:
+                  "GET",
+
+                headers:
+                  getUserHeaders(),
+              }
+            );
+
+
+          const patientData =
+            await patientResponse.json();
+
+
+          if (
+            !patientResponse.ok
+          ) {
+            return;
+          }
+
+
+          const patients =
+            Array.isArray(
+              patientData.patients
+            )
+              ? patientData.patients
+              : [];
+
+
+          // -------------------------------------------------
+          // STUDIES
+          // -------------------------------------------------
+
+          const studyResponse =
+            await fetch(
+              `${API_URL}/api/studies`,
+              {
+                method:
+                  "GET",
+
+                headers:
+                  getUserHeaders(),
+              }
+            );
+
+
+          const studyData =
+            await studyResponse.json();
+
+
+          if (
+            !studyResponse.ok
+          ) {
+            return;
+          }
+
+
+          const allStudies =
+            Array.isArray(
+              studyData.studies
+            )
+              ? studyData.studies
+              : [];
+
+
+          // -------------------------------------------------
+          // MERGE PATIENT DATA
+          // -------------------------------------------------
+
+          const studiesWithPatients =
+            allStudies.map(
+              (study) => {
+
+                const patient =
+                  patients.find(
+                    (item) =>
+                      Number(
+                        item.id
+                      ) ===
+                      Number(
+                        study.patientId
+                      )
+                  );
+
+
+                return {
+                  ...study,
+
+                  patientName:
+                    study.patientName ||
+                    patient?.name ||
+                    patient?.Name ||
+                    "Unknown Patient",
+
+                  patientAge:
+                    patient?.age ||
+                    patient?.Age ||
+                    "",
+
+                  patientGender:
+                    patient?.gender ||
+                    patient?.Gender ||
+                    "",
+
+                  patientPhone:
+                    patient?.phone ||
+                    patient?.Phone ||
+                    "",
+                };
+              }
+            );
+
+
+          setStudies(
+            studiesWithPatients
           );
-        const patientData =
-          await patientResponse.json();
-        if (!patientResponse.ok) {
-          return;
-        }
-        const patients =
-          patientData.patients ||
-          [];
-        const studyResponse =
-          await fetch(
-            `${API_URL}/api/studies`,
-            {
-              method: "GET",
-              headers:
-                getUserHeaders(),
-            }
+
+        } catch (error) {
+
+          console.error(
+            "Load Studies Error:",
+            error
           );
-        const studyData =
-          await studyResponse.json();
-        if (!studyResponse.ok) {
-          return;
         }
-        const allStudies =
-          studyData.studies || [];
-        const studiesWithPatients =
-          allStudies.map(
-            (study) => {
-              const patient =
-                patients.find(
-                  (item) =>
-                    Number(
-                      item.id
-                    ) ===
-                    Number(
-                      study.patientId
-                    )
-                );
-              return {
-                ...study,
-                patientName:
-                  patient?.name ||
-                  "Unknown Patient",
-                patientAge:
-                  patient?.age ||
-                  "",
-                patientGender:
-                  patient?.gender ||
-                  "",
-                patientPhone:
-                  patient?.phone ||
-                  "",
-              };
-            }
-          );
-        setStudies(
-          studiesWithPatients
-        );
-      } catch (error) {
-        console.error(
-          "Load Studies Error:",
-          error
-        );
-      }
-    }, [API_URL, getUserHeaders, getUserId]);
+
+      },
+      [
+        getUserId,
+        getUserHeaders,
+      ]
+    );
+
+
+  // =========================================================
+  // INITIAL PAGE LOAD
+  // =========================================================
+
   useEffect(() => {
+
+    let cancelled =
+      false;
+
+
     const loadPage =
       async () => {
-        setLoading(true);
+
+        setLoading(
+          true
+        );
+
+
         await Promise.all([
           loadReports(),
           loadStudies(),
         ]);
-        setLoading(false);
+
+
+        if (!cancelled) {
+          setLoading(
+            false
+          );
+        }
       };
+
+
     loadPage();
-  }, [loadReports, loadStudies]);
+
+
+    return () => {
+      cancelled =
+        true;
+    };
+
+  }, [
+    loadReports,
+    loadStudies,
+  ]);
+
+
+  // =========================================================
+  // LOAD IMAGE FOR REPORT PREVIEW
+  // =========================================================
+
   const loadReportImage =
-    async (report) => {
+    async (
+      report
+    ) => {
+
       if (
         !report?.patientId ||
         !report?.studyId
       ) {
-        setReportImage(null);
+
+        setReportImage(
+          null
+        );
+
         return;
       }
+
+
       const userId =
         getUserId();
+
+
       if (!userId) {
-        setReportImage(null);
+
+        setReportImage(
+          null
+        );
+
         return;
       }
+
+
       try {
+
         setLoadingReportImage(
           true
         );
+
+
         if (
           reportImage?.url
         ) {
+
           URL.revokeObjectURL(
             reportImage.url
           );
         }
-        setReportImage(null);
+
+
+        setReportImage(
+          null
+        );
+
+
         const response =
           await fetch(
             `${API_URL}/api/images?patientId=${report.patientId}&studyId=${report.studyId}`,
             {
-              method: "GET",
+              method:
+                "GET",
+
               headers: {
                 "x-user-id":
-                  String(userId),
+                  String(
+                    userId
+                  ),
               },
             }
           );
+
+
         const data =
           await response.json();
-        if (!response.ok) {
+
+
+        if (
+          !response.ok
+        ) {
+
           console.error(
             "Unable to load report images:",
             data.message
           );
-          setReportImage(null);
+
           return;
         }
+
+
         const imageList =
-          data.images || [];
+          Array.isArray(
+            data.images
+          )
+            ? data.images
+            : [];
+
+
         if (
           imageList.length === 0
         ) {
-          setReportImage(null);
+
+          setReportImage(
+            null
+          );
+
           return;
         }
+
+
         const firstImage =
           imageList[0];
+
+
         const imageId =
           firstImage.id ??
           firstImage.Id;
+
+
         const fileName =
           firstImage.fileName ??
           firstImage.FileName ??
           "Medical Image";
+
+
         if (!imageId) {
+
           console.error(
             "Image ID was not found:",
             firstImage
           );
-          setReportImage(null);
+
           return;
         }
+
+
         const imageResponse =
           await fetch(
             `${API_URL}/api/images/${imageId}`,
             {
-              method: "GET",
+              method:
+                "GET",
+
               headers: {
                 "x-user-id":
-                  String(userId),
+                  String(
+                    userId
+                  ),
               },
             }
           );
+
+
         if (
           !imageResponse.ok
         ) {
+
           console.error(
             "Unable to download preview image."
           );
-          setReportImage(null);
+
           return;
         }
+
+
         const blob =
           await imageResponse.blob();
+
+
         const imageUrl =
           URL.createObjectURL(
             blob
           );
+
+
         setReportImage({
-          url: imageUrl,
+          url:
+            imageUrl,
+
           fileName:
             fileName,
         });
+
       } catch (error) {
+
         console.error(
           "Load Report Image Error:",
           error
         );
-        setReportImage(null);
+
+        setReportImage(
+          null
+        );
+
       } finally {
+
         setLoadingReportImage(
           false
         );
       }
     };
+
+
+  // =========================================================
+  // FORM RESET
+  // =========================================================
+
   const resetForm =
     () => {
+
       const user =
         getLoggedInUser();
+
+
       setForm({
-        studyId: "",
+        studyId:
+          "",
+
         radiologistName:
           user?.fullName ||
+          user?.name ||
+          user?.username ||
           "",
-        findings: "",
-        impression: "",
+
+        findings:
+          "",
+
+        impression:
+          "",
+
         status:
           "Completed",
       });
+
+
       setEditingReport(
         null
       );
     };
+
+
+  // =========================================================
+  // OPEN CREATE
+  // =========================================================
+
   const handleOpenCreate =
     () => {
+
       resetForm();
-      setOpenForm(true);
+
+      setOpenForm(
+        true
+      );
     };
+
+
+  // =========================================================
+  // CLOSE FORM
+  // =========================================================
+
   const handleCloseForm =
     () => {
+
       if (saving) {
         return;
       }
-      setOpenForm(false);
+
+      setOpenForm(
+        false
+      );
+
       resetForm();
     };
+
+
+  // =========================================================
+  // FORM CHANGE
+  // =========================================================
+
   const handleChange =
     (event) => {
+
       const {
         name,
         value,
       } = event.target;
+
+
       setForm(
         (previous) => ({
           ...previous,
+
           [name]:
             value,
         })
       );
     };
+
+
+  // =========================================================
+  // FIND SELECTED STUDY
+  // =========================================================
+
   const selectedStudy =
     studies.find(
       (study) =>
@@ -419,314 +767,581 @@ function Reports() {
           form.studyId
         )
     );
+
+
+  // =========================================================
+  // SAVE REPORT
+  // =========================================================
+
   const handleSave =
     async () => {
-      if (!form.studyId) {
+
+      if (
+        !form.studyId
+      ) {
+
         alert(
           "Please select a study."
         );
+
         return;
       }
+
+
       if (
         !form.radiologistName.trim()
       ) {
+
         alert(
           "Please enter radiologist name."
         );
+
         return;
       }
+
+
       if (
         !form.findings.trim()
       ) {
+
         alert(
           "Please enter clinical findings."
         );
+
         return;
       }
+
+
       if (
         !form.impression.trim()
       ) {
+
         alert(
           "Please enter final impression."
         );
+
         return;
       }
+
+
+      const selected =
+        studies.find(
+          (study) =>
+            Number(
+              study.id
+            ) ===
+            Number(
+              form.studyId
+            )
+        );
+
+
       if (
         !editingReport &&
         Number(
-          selectedStudy?.imageCount ||
-            0
+          selected?.imageCount ||
+          0
         ) === 0
       ) {
-        alert(
-          "This study has no uploaded images. Please upload an image before creating the report."
-        );
-        return;
+
+        // Only warn when imageCount is explicitly
+        // available and equals zero.
+        if (
+          selected &&
+          typeof selected.imageCount !==
+            "undefined"
+        ) {
+
+          alert(
+            "This study has no uploaded images. Please upload an image before creating the report."
+          );
+
+          return;
+        }
       }
+
+
       const userId =
         getUserId();
+
+
       if (!userId) {
+
         alert(
           "Your login session was not found. Please login again."
         );
+
         return;
       }
+
+
       try {
-        setSaving(true);
+
+        setSaving(
+          true
+        );
+
+
         const url =
           editingReport
             ? `${API_URL}/api/reports/${editingReport.id}`
             : `${API_URL}/api/reports`;
+
+
         const method =
           editingReport
             ? "PUT"
             : "POST";
-          const reportPayload = {
-            ...form,
-            patientId:
-              selectedStudy?.patientId ||
-              editingReport?.patientId,
-          };
+
+
+        const reportPayload = {
+          ...form,
+
+          patientId:
+            selected?.patientId ||
+            editingReport?.patientId ||
+            null,
+        };
+
+
         const response =
           await fetch(
             url,
             {
               method,
+
               headers:
                 getUserHeaders(),
+
               body:
                 JSON.stringify(
                   reportPayload
                 ),
             }
           );
+
+
         const data =
           await response.json();
-        if (!response.ok) {
+
+
+        if (
+          !response.ok
+        ) {
+
           alert(
             data.message ||
               "Unable to save report"
           );
+
           return;
         }
+
+
         alert(
           editingReport
             ? "Report updated successfully"
             : "Report created successfully"
         );
-        setOpenForm(false);
+
+
+        setOpenForm(
+          false
+        );
+
+
         resetForm();
+
+
         await loadReports();
+
       } catch (error) {
+
         console.error(
           "Save Report Error:",
           error
         );
+
         alert(
           "Cannot connect to backend server."
         );
+
       } finally {
-        setSaving(false);
+
+        setSaving(
+          false
+        );
       }
     };
+      // =========================================================
+  // EDIT REPORT
+  // =========================================================
+
   const handleEdit =
     (report) => {
+
       setEditingReport(
         report
       );
+
+
       setForm({
         studyId:
           report.studyId ||
           "",
+
         radiologistName:
           report.radiologistName ||
           "",
+
         findings:
           report.findings ||
           "",
+
         impression:
           report.impression ||
           "",
+
         status:
           report.status ||
           "Completed",
       });
-      setOpenForm(true);
+
+
+      setOpenForm(
+        true
+      );
     };
+
+
+  // =========================================================
+  // VIEW REPORT
+  // =========================================================
+
   const handleView =
-    async (report) => {
+    async (
+      report
+    ) => {
+
       if (
         reportImage?.url
       ) {
+
         URL.revokeObjectURL(
           reportImage.url
         );
       }
-      setReportImage(null);
+
+
+      setReportImage(
+        null
+      );
+
+
       setSelectedReport(
         report
       );
-      setOpenView(true);
+
+
+      setOpenView(
+        true
+      );
+
+
       await loadReportImage(
         report
       );
     };
+
+
+  // =========================================================
+  // CLOSE REPORT PREVIEW
+  // =========================================================
+
   const handleCloseView =
     () => {
+
       if (
         reportImage?.url
       ) {
+
         URL.revokeObjectURL(
           reportImage.url
         );
       }
-      setReportImage(null);
-      setSelectedReport(null);
-      setOpenView(false);
+
+
+      setReportImage(
+        null
+      );
+
+
+      setSelectedReport(
+        null
+      );
+
+
+      setOpenView(
+        false
+      );
     };
+
+
+  // =========================================================
+  // DELETE REPORT
+  // =========================================================
+
   const handleDelete =
-    async (reportId) => {
+    async (
+      reportId
+    ) => {
+
       const confirmed =
         window.confirm(
           "Are you sure you want to delete this report?"
         );
+
+
       if (!confirmed) {
         return;
       }
+
+
       const userId =
         getUserId();
+
+
       if (!userId) {
+
         alert(
           "Your login session was not found. Please login again."
         );
+
         return;
       }
+
+
       try {
-        setDeleting(true);
+
+        setDeleting(
+          true
+        );
+
+
         const response =
           await fetch(
             `${API_URL}/api/reports/${reportId}`,
             {
-              method: "DELETE",
+              method:
+                "DELETE",
+
               headers: {
                 "x-user-id":
-                  String(userId),
+                  String(
+                    userId
+                  ),
               },
             }
           );
+
+
         const data =
           await response.json();
-        if (!response.ok) {
+
+
+        if (
+          !response.ok
+        ) {
+
           alert(
             data.message ||
               "Unable to delete report"
           );
+
           return;
         }
+
+
         alert(
           "Report deleted successfully"
         );
+
+
         if (
           selectedReport?.id ===
           reportId
         ) {
+
           handleCloseView();
         }
+
+
         await loadReports();
+
       } catch (error) {
+
         console.error(
           "Delete Report Error:",
           error
         );
+
         alert(
           "Cannot connect to backend server."
         );
+
       } finally {
-        setDeleting(false);
+
+        setDeleting(
+          false
+        );
       }
     };
+
+
+  // =========================================================
+  // FILTER REPORTS
+  // =========================================================
+
   const filteredReports =
     reports.filter(
       (report) => {
+
         const searchText =
           search
             .trim()
             .toLowerCase();
+
+
         if (!searchText) {
           return true;
         }
+
+
         const patientName =
           String(
             report.patientName ||
-              ""
+            ""
           ).toLowerCase();
+
+
         const studyNumber =
           String(
             report.studyNumber ||
-              ""
+            report.studyId ||
+            ""
           ).toLowerCase();
+
+
         const radiologistName =
           String(
             report.radiologistName ||
-              ""
+            ""
           ).toLowerCase();
+
+
         const findings =
           String(
             report.findings ||
-              ""
+            ""
           ).toLowerCase();
+
+
         const impression =
           String(
             report.impression ||
-              ""
+            ""
           ).toLowerCase();
+
+
+        const modality =
+          String(
+            report.modality ||
+            ""
+          ).toLowerCase();
+
+
         return (
           patientName.includes(
             searchText
           ) ||
+
           studyNumber.includes(
             searchText
           ) ||
+
           radiologistName.includes(
             searchText
           ) ||
+
           findings.includes(
             searchText
           ) ||
+
           impression.includes(
+            searchText
+          ) ||
+
+          modality.includes(
             searchText
           )
         );
       }
     );
+
+
+  // =========================================================
+  // PRINT
+  // =========================================================
+
   const handlePrint =
     () => {
+
       if (!selectedReport) {
         return;
       }
+
       window.print();
     };
+
+
+  // =========================================================
+  // STATUS COLOR
+  // =========================================================
+
   const getStatusColor =
     (status) => {
+
       switch (
         String(
           status || ""
         ).toLowerCase()
       ) {
-        case "Completed":
+
+        case "completed":
           return "success";
+
         case "pending":
           return "warning";
+
         case "draft":
           return "default";
+
         case "cancelled":
           return "error";
+
         default:
           return "primary";
       }
     };
+
+
+  // =========================================================
+  // FIND STUDY FOR REPORT
+  // =========================================================
+
   const getStudyForReport =
     (report) => {
+
       return studies.find(
         (study) =>
           Number(
@@ -737,56 +1352,156 @@ function Reports() {
           )
       );
     };
+
+
+  // =========================================================
+  // DATE FORMAT
+  // =========================================================
+
   const formatDate =
     (date) => {
+
       if (!date) {
         return "-";
       }
+
+
       const parsedDate =
-        new Date(date);
+        new Date(
+          date
+        );
+
+
       if (
         Number.isNaN(
           parsedDate.getTime()
         )
       ) {
-        return date;
+
+        return String(
+          date
+        );
       }
+
+
       return parsedDate.toLocaleDateString(
         "en-IN",
         {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
+          day:
+            "2-digit",
+
+          month:
+            "short",
+
+          year:
+            "numeric",
         }
       );
     };
+
+
+  // =========================================================
+  // REPORT PREVIEW
+  // =========================================================
+
   const renderReportPreview =
     () => {
-      if (!selectedReport) {
+
+      if (
+        !selectedReport
+      ) {
         return null;
       }
+
+
       const selectedStudy =
         getStudyForReport(
           selectedReport
         );
+
+
+      /*
+       * Patient name can come from either:
+       *
+       * 1. Reports API -> patientName
+       * 2. Related Study -> patientName
+       *
+       * This fixes the old "Patient: -" header.
+       */
+
+      const patientName =
+        selectedReport.patientName ||
+        selectedStudy?.patientName ||
+        "Unknown Patient";
+
+
+      const patientId =
+        selectedReport.patientId ||
+        selectedStudy?.patientId ||
+        "-";
+
+
+      const studyNumber =
+        selectedStudy?.studyId ||
+        selectedReport.studyNumber ||
+        selectedReport.studyId ||
+        "-";
+
+
+      const modality =
+        selectedStudy?.modality ||
+        selectedReport.modality ||
+        "-";
+
+
+      const bodyPart =
+        selectedStudy?.bodyPart ||
+        selectedReport.bodyPart ||
+        "-";
+
+
+      const studyDate =
+        selectedStudy?.studyDate ||
+        selectedReport.studyDate ||
+        null;
+
+
       return (
         <Box
           sx={{
             backgroundColor:
               "#ffffff",
+
             p: {
-              xs: 2,
-              md: 4,
+              xs:
+                2,
+
+              md:
+                4,
             },
-            borderRadius: 2,
+
+            borderRadius:
+              2,
+
+            color:
+              "#111827",
           }}
         >
+
+          {/* =================================================
+              REPORT HEADER
+          ================================================== */}
+
           <Box
             sx={{
-              textAlign: "center",
-              mb: 3,
+              textAlign:
+                "center",
+
+              mb:
+                3,
             }}
           >
+
             <Typography
               variant="h5"
               fontWeight="bold"
@@ -794,6 +1509,7 @@ function Reports() {
               RADIOLOGY MEDICAL
               REPORT
             </Typography>
+
             <Typography
               variant="body2"
               color="text.secondary"
@@ -802,8 +1518,22 @@ function Reports() {
               Radiology Medical Image
               Viewing System
             </Typography>
+
           </Box>
-          <Divider sx={{ mb: 3 }} />
+
+
+          <Divider
+            sx={{
+              mb:
+                3,
+            }}
+          />
+
+
+          {/* =================================================
+              PATIENT INFORMATION
+          ================================================== */}
+
           <Typography
             variant="h6"
             fontWeight="bold"
@@ -811,75 +1541,94 @@ function Reports() {
           >
             Patient Information
           </Typography>
+
+
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-              },
-              gap: 2,
-              mb: 3,
+              display:
+                "grid",
+
+              gridTemplateColumns:
+                {
+                  xs:
+                    "1fr",
+
+                  sm:
+                    "1fr 1fr",
+                },
+
+              gap:
+                2,
+
+              mb:
+                3,
             }}
           >
+
             <Typography>
               <strong>
                 Patient Name:
               </strong>{" "}
-              {
-                selectedReport.patientName ||
-                "-"
-              }
+              {patientName}
             </Typography>
+
+
             <Typography>
               <strong>
                 Patient ID:
               </strong>{" "}
-              {
-                selectedReport.patientId ||
-                "-"
-              }
+              {patientId}
             </Typography>
+
+
             <Typography>
               <strong>
                 Study ID:
               </strong>{" "}
-              {
-                selectedStudy?.studyId ||
-                selectedReport.studyNumber ||
-                "-"
-              }
+              {studyNumber}
             </Typography>
+
+
             <Typography>
               <strong>
                 Modality:
               </strong>{" "}
-              {
-                selectedStudy?.modality ||
-                "-"
-              }
+              {modality}
             </Typography>
+
+
             <Typography>
               <strong>
                 Body Part:
               </strong>{" "}
-              {
-                selectedStudy?.bodyPart ||
-                "-"
-              }
+              {bodyPart}
             </Typography>
+
+
             <Typography>
               <strong>
                 Study Date:
               </strong>{" "}
-              {
-                formatDate(
-                  selectedStudy?.studyDate
-                )
-              }
+              {formatDate(
+                studyDate
+              )}
             </Typography>
+
           </Box>
-          <Divider sx={{ mb: 3 }} />
+
+
+          <Divider
+            sx={{
+              mb:
+                3,
+            }}
+          />
+
+
+          {/* =================================================
+              MEDICAL IMAGE
+          ================================================== */}
+
           <Typography
             variant="h6"
             fontWeight="bold"
@@ -887,42 +1636,75 @@ function Reports() {
           >
             Medical Image
           </Typography>
+
+
           <Box
             sx={{
-              width: "100%",
-              minHeight: 250,
+              width:
+                "100%",
+
+              minHeight:
+                250,
+
               backgroundColor:
                 "#111111",
-              borderRadius: 2,
-              display: "flex",
+
+              borderRadius:
+                2,
+
+              display:
+                "flex",
+
               justifyContent:
                 "center",
+
               alignItems:
                 "center",
-              overflow: "hidden",
-              mb: 3,
+
+              overflow:
+                "hidden",
+
+              mb:
+                3,
             }}
           >
+
             {loadingReportImage ? (
+
               <Box
                 sx={{
-                  display: "flex",
+                  display:
+                    "flex",
+
                   flexDirection:
                     "column",
+
                   alignItems:
                     "center",
-                  gap: 2,
-                  color: "#ffffff",
+
+                  gap:
+                    2,
+
+                  color:
+                    "#ffffff",
+
+                  p:
+                    4,
                 }}
               >
+
                 <CircularProgress
                   color="inherit"
                 />
+
                 <Typography>
                   Loading image preview...
                 </Typography>
+
               </Box>
+
             ) : reportImage?.url ? (
+
               <img
                 src={
                   reportImage.url
@@ -932,49 +1714,82 @@ function Reports() {
                   "Medical Report"
                 }
                 style={{
-                  maxWidth: "100%",
-                  maxHeight: "450px",
+                  maxWidth:
+                    "100%",
+
+                  maxHeight:
+                    "450px",
+
                   objectFit:
                     "contain",
-                  display: "block",
+
+                  display:
+                    "block",
                 }}
               />
 
             ) : (
+
               <Box
                 sx={{
-                  textAlign: "center",
-                  color: "#ffffff",
-                  p: 4,
+                  textAlign:
+                    "center",
+
+                  color:
+                    "#ffffff",
+
+                  p:
+                    4,
                 }}
               >
+
                 <ImageIcon
                   sx={{
-                    fontSize: 60,
-                    opacity: 0.6,
-                    mb: 1,
+                    fontSize:
+                      60,
+
+                    opacity:
+                      0.6,
+
+                    mb:
+                      1,
                   }}
                 />
+
                 <Typography>
                   No medical image
                   available for this
                   report.
                 </Typography>
+
                 <Typography
                   variant="caption"
                   sx={{
-                    display: "block",
-                    mt: 1,
-                    opacity: 0.7,
+                    display:
+                      "block",
+
+                    mt:
+                      1,
+
+                    opacity:
+                      0.7,
                   }}
                 >
                   Upload an image to
                   the associated study
                   to display it here.
                 </Typography>
+
               </Box>
             )}
+
           </Box>
+
+
+          {/* =================================================
+              FINDINGS
+          ================================================== */}
+
           <Typography
             variant="h6"
             fontWeight="bold"
@@ -982,15 +1797,22 @@ function Reports() {
           >
             Clinical Findings
           </Typography>
+
+
           <Paper
             variant="outlined"
             sx={{
-              p: 2,
-              mb: 3,
+              p:
+                2,
+
+              mb:
+                3,
+
               backgroundColor:
                 "#fafafa",
             }}
           >
+
             <Typography
               sx={{
                 whiteSpace:
@@ -1002,7 +1824,14 @@ function Reports() {
                 "No findings provided."
               }
             </Typography>
+
           </Paper>
+
+
+          {/* =================================================
+              IMPRESSION
+          ================================================== */}
+
           <Typography
             variant="h6"
             fontWeight="bold"
@@ -1010,15 +1839,22 @@ function Reports() {
           >
             Final Impression
           </Typography>
+
+
           <Paper
             variant="outlined"
             sx={{
-              p: 2,
-              mb: 3,
+              p:
+                2,
+
+              mb:
+                3,
+
               backgroundColor:
                 "#fafafa",
             }}
           >
+
             <Typography
               fontWeight="bold"
               sx={{
@@ -1031,18 +1867,41 @@ function Reports() {
                 "No impression provided."
               }
             </Typography>
+
           </Paper>
-          <Divider sx={{ mb: 2 }} />
+
+
+          <Divider
+            sx={{
+              mb:
+                2,
+            }}
+          />
+
+
+          {/* =================================================
+              REPORT DETAILS
+          ================================================== */}
+
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-              },
-              gap: 2,
+              display:
+                "grid",
+
+              gridTemplateColumns:
+                {
+                  xs:
+                    "1fr",
+
+                  sm:
+                    "1fr 1fr",
+                },
+
+              gap:
+                2,
             }}
           >
+
             <Typography>
               <strong>
                 Radiologist:
@@ -1052,6 +1911,8 @@ function Reports() {
                 "-"
               }
             </Typography>
+
+
             <Typography>
               <strong>
                 Report Date:
@@ -1062,10 +1923,13 @@ function Reports() {
                 )
               }
             </Typography>
+
+
             <Typography>
               <strong>
                 Status:
               </strong>{" "}
+
               <Chip
                 label={
                   selectedReport.status ||
@@ -1078,41 +1942,73 @@ function Reports() {
                 }
                 size="small"
               />
+
             </Typography>
+
           </Box>
+
         </Box>
       );
     };
+      // =========================================================
+  // RENDER
+  // =========================================================
+
   return (
     <Layout>
+
       <Box>
+
+        {/* ===================================================
+            PAGE HEADER
+        ==================================================== */}
+
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 2,
-            mb: 2.5,
-            flexWrap: "wrap",
+            display:
+              "flex",
+
+            justifyContent:
+              "space-between",
+
+            alignItems:
+              "flex-start",
+
+            gap:
+              2,
+
+            mb:
+              2.5,
+
+            flexWrap:
+              "wrap",
           }}
         >
+
           <Box>
+
             <Typography
               variant="h4"
               fontWeight="bold"
             >
               Radiology Reports
             </Typography>
+
             <Typography
               color="text.secondary"
               variant="body2"
               sx={{
-                mt: 0.7,
+                mt:
+                  0.7,
               }}
             >
-              Create, review and manage diagnostic reports
+              Create, review and manage
+              diagnostic reports
             </Typography>
+
           </Box>
+
+
           <Button
             variant="contained"
             startIcon={
@@ -1122,86 +2018,153 @@ function Reports() {
               handleOpenCreate
             }
             sx={{
-              minWidth: 150,
-              borderRadius: 2,
-              textTransform: "none",
-              fontWeight: 600,
+              minWidth:
+                150,
+
+              borderRadius:
+                2,
+
+              textTransform:
+                "none",
+
+              fontWeight:
+                600,
             }}
           >
             Create Report
           </Button>
+
         </Box>
+
+
+        {/* ===================================================
+            SEARCH
+        ==================================================== */}
+
         <Paper
           elevation={0}
           sx={{
-            p: 2,
-            mb: 2.5,
-            borderRadius: 2.5,
-            border: "1px solid",
-            borderColor: "divider",
-            backgroundColor: "background.paper",
+            p:
+              2,
+
+            mb:
+              2.5,
+
+            borderRadius:
+              2.5,
+
+            border:
+              "1px solid",
+
+            borderColor:
+              "divider",
+
+            backgroundColor:
+              "background.paper",
           }}
         >
+
           <TextField
             fullWidth
             size="small"
             placeholder="Search by patient, study or radiologist..."
-            value={search}
-            onChange={(event) =>
-              setSearch(
-                event.target.value
-              )
+            value={
+              search
+            }
+            onChange={
+              (event) =>
+                setSearch(
+                  event.target.value
+                )
             }
             InputProps={{
-              startAdornment: (
-                <InputAdornment
-                  position="start"
-                >
-                  <SearchIcon
-                    color="action"
-                  />
-                </InputAdornment>
-              ),
+              startAdornment:
+                (
+                  <InputAdornment
+                    position="start"
+                  >
+                    <SearchIcon
+                      color="action"
+                    />
+                  </InputAdornment>
+                ),
             }}
             sx={{
               "& .MuiOutlinedInput-root":
                 {
-                  borderRadius: 1.8,
+                  borderRadius:
+                    1.8,
                 },
             }}
           />
+
         </Paper>
+
+
+        {/* ===================================================
+            REPORT TABLE
+        ==================================================== */}
+
         <Paper
           elevation={0}
           sx={{
-            borderRadius: 2.5,
-            overflow: "hidden",
-            border: "1px solid",
-            borderColor: "divider",
-            backgroundColor: "background.paper",
+            borderRadius:
+              2.5,
+
+            overflow:
+              "hidden",
+
+            border:
+              "1px solid",
+
+            borderColor:
+              "divider",
+
+            backgroundColor:
+              "background.paper",
           }}
         >
+
           <Box
             sx={{
-              px: 2.5,
-              py: 2,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 2,
-              borderBottom: "1px solid",
-              borderColor: "divider",
+              px:
+                2.5,
+
+              py:
+                2,
+
+              display:
+                "flex",
+
+              justifyContent:
+                "space-between",
+
+              alignItems:
+                "center",
+
+              gap:
+                2,
+
+              borderBottom:
+                "1px solid",
+
+              borderColor:
+                "divider",
             }}
           >
+
             <Typography
               variant="h6"
               fontWeight="bold"
             >
               Reports
             </Typography>
+
+
             <Chip
               label={`${filteredReports.length} ${
-                filteredReports.length === 1
+                filteredReports.length ===
+                1
                   ? "report"
                   : "reports"
               }`}
@@ -1209,43 +2172,64 @@ function Reports() {
               color="primary"
               variant="outlined"
             />
+
           </Box>
+
+
           {loading ? (
+
             <Box
               sx={{
-                py: 6,
-                textAlign: "center",
+                py:
+                  6,
+
+                textAlign:
+                  "center",
               }}
             >
+
               <CircularProgress />
+
               <Typography
                 color="text.secondary"
                 mt={2}
               >
                 Loading reports...
               </Typography>
+
             </Box>
-          ) : filteredReports.length ===
-            0 ? (
+
+          ) : filteredReports.length === 0 ? (
+
             <Box
               sx={{
-                py: 6,
-                textAlign: "center",
+                py:
+                  6,
+
+                textAlign:
+                  "center",
               }}
             >
+
               <DescriptionIcon
                 sx={{
-                  fontSize: 60,
+                  fontSize:
+                    60,
+
                   color:
                     "text.secondary",
-                  mb: 1,
+
+                  mb:
+                    1,
                 }}
               />
+
               <Typography
                 variant="h6"
               >
                 No reports found
               </Typography>
+
               <Typography
                 color="text.secondary"
                 mt={1}
@@ -1253,87 +2237,157 @@ function Reports() {
                 Create a report to see
                 it here.
               </Typography>
+
             </Box>
+
           ) : (
+
             <Box
               sx={{
-                px: 1,
-                pb: 1,
+                px:
+                  1,
+
+                pb:
+                  1,
               }}
             >
+
               <TableContainer>
+
                 <Table>
+
                   <TableHead>
+
                     <TableRow>
+
                       <TableCell>
-                        <strong>Patient</strong>
+                        <strong>
+                          Patient
+                        </strong>
                       </TableCell>
+
                       <TableCell>
-                        <strong>Study</strong>
+                        <strong>
+                          Study
+                        </strong>
                       </TableCell>
+
                       <TableCell>
-                        <strong>Radiologist</strong>
+                        <strong>
+                          Radiologist
+                        </strong>
                       </TableCell>
+
                       <TableCell>
-                        <strong>Status</strong>
+                        <strong>
+                          Status
+                        </strong>
                       </TableCell>
+
                       <TableCell>
-                        <strong>Date</strong>
+                        <strong>
+                          Date
+                        </strong>
                       </TableCell>
-                      <TableCell align="right">
-                        <strong>Actions</strong>
+
+                      <TableCell
+                        align="right"
+                      >
+                        <strong>
+                          Actions
+                        </strong>
                       </TableCell>
+
                     </TableRow>
+
                   </TableHead>
+
+
                   <TableBody>
+
                     {filteredReports.map(
-                      (report) => (
+                      (
+                        report
+                      ) => (
 
                         <TableRow
-                          key={report.id}
+                          key={
+                            report.id
+                          }
                           hover
                         >
+
+                          {/* PATIENT */}
+
                           <TableCell>
+
                             <Typography
                               fontWeight="600"
                             >
-                              {report.patientName ||
-                                "Unknown Patient"}
+                              {
+                                report.patientName ||
+                                "Unknown Patient"
+                              }
                             </Typography>
+
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
                               ID:{" "}
-                              {report.patientId ||
-                                "-"}
+                              {
+                                report.patientId ||
+                                "-"
+                              }
                             </Typography>
+
                           </TableCell>
+
+
+                          {/* STUDY */}
+
                           <TableCell>
+
                             <Typography
                               fontWeight="500"
                             >
-                              {report.studyNumber ||
+                              {
+                                report.studyNumber ||
                                 report.studyId ||
-                                "-"}
+                                "-"
+                              }
                             </Typography>
+
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              {report.modality ||
+                              {
+                                report.modality ||
                                 getStudyForReport(
                                   report
                                 )?.modality ||
-                                "-"}
+                                "-"
+                              }
                             </Typography>
+
                           </TableCell>
+
+
                           {/* RADIOLOGIST */}
+
                           <TableCell>
-                            {report.radiologistName ||
-                              "-"}
+                            {
+                              report.radiologistName ||
+                              "-"
+                            }
                           </TableCell>
+
+
+                          {/* STATUS */}
+
                           <TableCell>
+
                             <Chip
                               label={
                                 report.status ||
@@ -1346,24 +2400,40 @@ function Reports() {
                               }
                               size="small"
                             />
+
                           </TableCell>
+
+
+                          {/* DATE */}
+
                           <TableCell>
-                            {formatDate(
-                              report.reportDate
-                            )}
+                            {
+                              formatDate(
+                                report.reportDate
+                              )
+                            }
                           </TableCell>
+
+
+                          {/* ACTIONS */}
+
                           <TableCell
                             align="right"
                           >
+
                             <Box
                               sx={{
                                 display:
                                   "flex",
+
                                 justifyContent:
                                   "flex-end",
-                                gap: 0.5,
-                            }}
+
+                                gap:
+                                  0.5,
+                              }}
                             >
+
                               <Button
                                 size="small"
                                 variant="contained"
@@ -1375,9 +2445,15 @@ function Reports() {
                                     report
                                   )
                                 }
+                                sx={{
+                                  textTransform:
+                                    "none",
+                                }}
                               >
                                 View
                               </Button>
+
+
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -1389,9 +2465,15 @@ function Reports() {
                                     report
                                   )
                                 }
+                                sx={{
+                                  textTransform:
+                                    "none",
+                                }}
                               >
                                 Edit
                               </Button>
+
+
                               <IconButton
                                 color="error"
                                 onClick={() =>
@@ -1405,33 +2487,61 @@ function Reports() {
                               >
                                 <DeleteIcon />
                               </IconButton>
+
                             </Box>
+
                           </TableCell>
+
                         </TableRow>
                       )
                     )}
+
                   </TableBody>
+
                 </Table>
+
               </TableContainer>
+
             </Box>
           )}
+
         </Paper>
+
+
+        {/* ===================================================
+            CREATE / EDIT REPORT DIALOG
+        ==================================================== */}
+
         <Dialog
-          open={openForm}
-          onClose={handleCloseForm}
+          open={
+            openForm
+          }
+          onClose={
+            handleCloseForm
+          }
           fullWidth
           maxWidth="md"
         >
+
           <DialogTitle>
-            {editingReport
-              ? "Edit Radiology Report"
-              : "Create Radiology Report"}
+            {
+              editingReport
+                ? "Edit Radiology Report"
+                : "Create Radiology Report"
+            }
           </DialogTitle>
+
+
           <DialogContent>
+
             <Stack
               spacing={2}
-              sx={{ mt: 1 }}
+              sx={{
+                mt:
+                  1,
+              }}
             >
+
               <TextField
                 select
                 fullWidth
@@ -1443,37 +2553,65 @@ function Reports() {
                 onChange={
                   handleChange
                 }
+                disabled={
+                  Boolean(
+                    editingReport
+                  )
+                }
               >
+
                 <MenuItem value="">
                   Select Study
                 </MenuItem>
+
                 {studies.map(
-                  (study) => (
+                  (
+                    study
+                  ) => (
+
                     <MenuItem
-                      key={study.id}
-                      value={study.id}
+                      key={
+                        study.id
+                      }
+                      value={
+                        study.id
+                      }
                     >
-                      {study.studyId ||
-                        `Study ${study.id}`}
+                      {
+                        study.studyId ||
+                        `Study ${study.id}`
+                      }
                       {" - "}
-                      {study.patientName ||
-                        "Unknown Patient"}
+                      {
+                        study.patientName ||
+                        "Unknown Patient"
+                      }
                       {" - "}
-                      {study.modality ||
-                        "Unknown Modality"}
+                      {
+                        study.modality ||
+                        "Unknown Modality"
+                      }
                     </MenuItem>
+
                   )
                 )}
+
               </TextField>
+
+
               {selectedStudy && (
+
                 <Paper
                   variant="outlined"
                   sx={{
-                    p: 2,
+                    p:
+                      2,
+
                     backgroundColor:
                       "#f7f9fc",
                   }}
                 >
+
                   <Typography
                     variant="subtitle1"
                     fontWeight="bold"
@@ -1481,17 +2619,27 @@ function Reports() {
                   >
                     Selected Study
                   </Typography>
+
+
                   <Box
                     sx={{
-                      display: "grid",
+                      display:
+                        "grid",
+
                       gridTemplateColumns:
                         {
-                          xs: "1fr",
-                          sm: "1fr 1fr",
+                          xs:
+                            "1fr",
+
+                          sm:
+                            "1fr 1fr",
                         },
-                      gap: 1,
+
+                      gap:
+                        1,
                     }}
                   >
+
                     <Typography>
                       <strong>
                         Patient:
@@ -1501,6 +2649,8 @@ function Reports() {
                         "-"
                       }
                     </Typography>
+
+
                     <Typography>
                       <strong>
                         Study ID:
@@ -1510,6 +2660,8 @@ function Reports() {
                         "-"
                       }
                     </Typography>
+
+
                     <Typography>
                       <strong>
                         Modality:
@@ -1519,6 +2671,8 @@ function Reports() {
                         "-"
                       }
                     </Typography>
+
+
                     <Typography>
                       <strong>
                         Body Part:
@@ -1528,17 +2682,19 @@ function Reports() {
                         "-"
                       }
                     </Typography>
+
+
                     <Typography>
                       <strong>
                         Images:
                       </strong>{" "}
                       {
-                        Number(
-                          selectedStudy.imageCount ||
-                            0
-                        )
+                        selectedStudy.imageCount ??
+                        "-"
                       }
                     </Typography>
+
+
                     <Typography>
                       <strong>
                         Status:
@@ -1548,9 +2704,13 @@ function Reports() {
                         "-"
                       }
                     </Typography>
+
                   </Box>
+
                 </Paper>
               )}
+
+
               <TextField
                 fullWidth
                 label="Radiologist Name"
@@ -1562,10 +2722,12 @@ function Reports() {
                   handleChange
                 }
               />
+
+
               <TextField
                 fullWidth
                 multiline
-                minRows={5}
+                minRows={6}
                 label="Clinical Findings"
                 name="findings"
                 value={
@@ -1576,6 +2738,8 @@ function Reports() {
                 }
                 placeholder="Enter detailed clinical findings..."
               />
+
+
               <TextField
                 fullWidth
                 multiline
@@ -1590,6 +2754,8 @@ function Reports() {
                 }
                 placeholder="Enter the final radiological impression..."
               />
+
+
               <TextField
                 select
                 fullWidth
@@ -1602,96 +2768,152 @@ function Reports() {
                   handleChange
                 }
               >
+
                 <MenuItem value="Draft">
                   Draft
                 </MenuItem>
+
                 <MenuItem value="Pending">
                   Pending
                 </MenuItem>
+
                 <MenuItem value="Completed">
                   Completed
                 </MenuItem>
+
                 <MenuItem value="Cancelled">
                   Cancelled
                 </MenuItem>
+
               </TextField>
+
             </Stack>
+
           </DialogContent>
+
+
           <DialogActions
             sx={{
-              p: 2,
+              p:
+                2,
             }}
           >
+
             <Button
               onClick={
                 handleCloseForm
               }
-              disabled={saving}
+              disabled={
+                saving
+              }
             >
               Cancel
             </Button>
+
+
             <Button
               variant="contained"
               onClick={
                 handleSave
               }
-              disabled={saving}
+              disabled={
+                saving
+              }
             >
+
               {saving ? (
+
                 <>
+
                   <CircularProgress
                     size={20}
                     sx={{
-                      mr: 1,
+                      mr:
+                        1,
                     }}
                   />
+
                   Saving...
+
                 </>
+
               ) : (
+
                 editingReport
                   ? "Update Report"
                   : "Create Report"
+
               )}
+
             </Button>
+
           </DialogActions>
+
         </Dialog>
+
+
+        {/* ===================================================
+            REPORT PREVIEW
+        ==================================================== */}
+
         <Dialog
-          open={openView}
+          open={
+            openView
+          }
           onClose={
             handleCloseView
           }
           fullWidth
           maxWidth="lg"
         >
+
           <DialogTitle
             sx={{
-              display: "flex",
+              display:
+                "flex",
+
               justifyContent:
                 "space-between",
-              alignItems: "center",
-              gap: 2,
+
+              alignItems:
+                "center",
+
+              gap:
+                2,
             }}
           >
+
             <Box>
+
               <Typography
                 variant="h6"
                 fontWeight="bold"
               >
                 Report Preview
               </Typography>
+
+
               {selectedReport && (
+
                 <Typography
                   variant="body2"
                   color="text.secondary"
                 >
                   Patient:{" "}
                   {
-                    selectedReport.patients||
-                    "-"
+                    selectedReport.patientName ||
+                    getStudyForReport(
+                      selectedReport
+                    )?.patientName ||
+                    "Unknown Patient"
                   }
                 </Typography>
+
               )}
+
             </Box>
+
+
             <Button
               variant="outlined"
               startIcon={
@@ -1703,26 +2925,44 @@ function Reports() {
             >
               Print
             </Button>
+
           </DialogTitle>
+
+
           <DialogContent
             dividers
             sx={{
               backgroundColor:
                 "#e9eef3",
-              p: {
-                xs: 1,
-                sm: 2,
-                md: 3,
-              },
+
+              p:
+                {
+                  xs:
+                    1,
+
+                  sm:
+                    2,
+
+                  md:
+                    3,
+                },
             }}
           >
-            {renderReportPreview()}
+
+            {
+              renderReportPreview()
+            }
+
           </DialogContent>
+
+
           <DialogActions
             sx={{
-              p: 2,
+              p:
+                2,
             }}
           >
+
             <Button
               variant="outlined"
               onClick={
@@ -1731,9 +2971,13 @@ function Reports() {
             >
               Close
             </Button>
+
           </DialogActions>
+
         </Dialog>
+
       </Box>
+
     </Layout>
   );
 }

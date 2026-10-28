@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pillow
+python-multipart
+pydicom
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+torch
+torchvision
+transformers
+TotalSegmentator
+nibabel
+open_clip_torch
+torchxrayvision

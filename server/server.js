@@ -1,8 +1,11 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const sql = require("mssql");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
+const axios = require("axios");
 
 const app = express();
 
@@ -31,12 +34,12 @@ app.use(
    SQL SERVER CONFIGURATION
 ========================= */
 
+// Credentials come only from server/.env (never commit them).
 const dbConfig = {
-  user: process.env.DB_USER || "Mani",
+  user: process.env.DB_USER,
 
   password:
-    process.env.DB_PASSWORD ||
-    "Mani@7013",
+    process.env.DB_PASSWORD,
 
   server:
     process.env.DB_SERVER ||
@@ -221,7 +224,7 @@ const upload = multer({
   },
 
   fileFilter:
-    (req, file, cb) => {
+    (_req, file, cb) => {
       const fileName =
         String(
           file.originalname || ""
@@ -1057,7 +1060,7 @@ async function initializeDatabase() {
 
 app.get(
   "/",
-  (req, res) => {
+  (_req, res) => {
     res.send(
       "Radiology Medical Image Viewing System Backend Running..."
     );
@@ -4241,41 +4244,27 @@ app.get(
             "User ID is required",
         });
       }
-
-
       let query = `
         SELECT
-
           pi.Id AS id,
-
           pi.PatientId
             AS patientId,
-
           pi.StudyId
             AS studyId,
-
           pi.SeriesId
             AS seriesId,
-
           pi.ImageOrder
             AS imageOrder,
-
           pi.FileName
             AS fileName,
-
           pi.ContentType
             AS contentType,
-
           pi.CreatedAt
             AS createdAt
-
         FROM dbo.PatientImages pi
-
         WHERE pi.UserId =
           @userId
       `;
-
-
       const request =
         pool
           .request()
@@ -4284,8 +4273,6 @@ app.get(
             sql.Int,
             userId
           );
-
-
       if (
         patientId
       ) {
@@ -4297,11 +4284,9 @@ app.get(
         request.input(
           "patientId",
           sql.Int,
-          patientId
+          patientId,
         );
       }
-
-
       if (
         studyId
       ) {
@@ -4371,6 +4356,208 @@ app.get(
         success: false,
         message:
           "Unable to get images",
+      });
+    }
+  }
+);
+
+
+/* =========================================================
+   DICOM IMAGE PREVIEW
+   Converts DICOM to browser-displayable PNG through Python
+========================================================= */
+
+app.get(
+  "/api/images/:id/preview",
+  async (req, res) => {
+    try {
+      const userId =
+        getUserId(req);
+
+      const imageId =
+        Number(
+          req.params.id
+        );
+
+      if (
+        !userId ||
+        !imageId
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "User ID and Image ID are required",
+        });
+      }
+
+      const result =
+        await pool
+          .request()
+          .input(
+            "id",
+            sql.Int,
+            imageId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            SELECT
+              Id AS id,
+              FileName AS fileName,
+              ContentType AS contentType,
+              ImageData AS imageData
+            FROM dbo.PatientImages
+            WHERE Id = @id
+              AND UserId = @userId
+          `);
+
+      if (
+        result.recordset.length === 0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Image not found",
+        });
+      }
+
+      const image =
+        result.recordset[0];
+
+      const imageData =
+        image.imageData;
+
+      if (!imageData) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Image data not found",
+        });
+      }
+
+      const fileName =
+        String(
+          image.fileName || ""
+        ).toLowerCase();
+
+      const contentType =
+        String(
+          image.contentType || ""
+        ).toLowerCase();
+
+      const isDicom =
+        fileName.endsWith(".dcm") ||
+        fileName.endsWith(".dicom") ||
+        contentType.includes("dicom") ||
+        contentType ===
+          "application/octet-stream";
+
+      /* =====================================================
+         NORMAL JPG / PNG
+      ====================================================== */
+
+      if (!isDicom) {
+        res.set(
+          "Cache-Control",
+          "private, max-age=3600"
+        );
+
+        res.type(
+          image.contentType ||
+            "image/png"
+        );
+
+        return res.send(
+          imageData
+        );
+      }
+
+      /* =====================================================
+         DICOM → BASE64
+      ====================================================== */
+
+      const dataBase64 =
+        Buffer
+          .from(imageData)
+          .toString("base64");
+
+      const aiServiceUrl =
+        process.env.AI_SERVICE_URL ||
+        "http://127.0.0.1:8000";
+
+      /* =====================================================
+         SEND DICOM TO PYTHON RENDERER
+      ====================================================== */
+
+      const aiResponse =
+        await axios.post(
+          `${aiServiceUrl}/api/ai/render-dicom`,
+          {
+            dataBase64,
+          },
+          {
+            timeout:
+              120000,
+            maxContentLength:
+              100 * 1024 * 1024,
+            maxBodyLength:
+              100 * 1024 * 1024,
+          }
+        );
+
+      const responseData =
+        aiResponse.data;
+
+      if (
+        !responseData ||
+        !responseData.success ||
+        !responseData.dataBase64
+      ) {
+        throw new Error(
+          "Python DICOM renderer returned an invalid response."
+        );
+      }
+
+      const pngBuffer =
+        Buffer.from(
+          responseData.dataBase64,
+          "base64"
+        );
+
+      res.set(
+        "Cache-Control",
+        "private, max-age=3600"
+      );
+
+      res.type(
+        "image/png"
+      );
+
+      return res.send(
+        pngBuffer
+      );
+
+    } catch (error) {
+      console.error(
+        "DICOM Preview Error:"
+      );
+
+      console.error(
+        error?.response?.data ||
+          error?.message ||
+          error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          error?.message ||
+          "Unable to render DICOM preview.",
       });
     }
   }
@@ -4806,7 +4993,374 @@ app.delete(
     }
   }
 );
+/* =========================================================
+   AI RADIOLOGY COPILOT
+   ========================================================= */
 
+app.post(
+  "/api/ai/analyze-study",
+  async (req, res) => {
+    try {
+      const userId = getUserId(req);
+
+      const databaseStudyId = Number(
+        req.body.studyId
+      );
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "User ID is required",
+        });
+      }
+
+      if (!databaseStudyId) {
+        return res.status(400).json({
+          success: false,
+          message: "Study ID is required",
+        });
+      }
+
+      /* =====================================================
+         1. GET STUDY
+         ===================================================== */
+
+      const studyResult =
+        await pool
+          .request()
+          .input(
+            "studyId",
+            sql.Int,
+            databaseStudyId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            SELECT
+              s.Id AS id,
+              s.UserId AS userId,
+              s.PatientId AS patientId,
+              s.StudyId AS studyId,
+              s.BodyPart AS bodyPart,
+              s.StudyDate AS studyDate,
+              s.StudyDescription AS studyDescription,
+              s.Modality AS modality,
+              s.Status AS status,
+              p.Name AS patientName
+            FROM dbo.Studies s
+            LEFT JOIN dbo.Patients p
+              ON p.Id = s.PatientId
+            WHERE s.Id = @studyId
+              AND s.UserId = @userId
+          `);
+
+      if (
+        studyResult.recordset.length === 0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Study not found",
+        });
+      }
+
+      const study =
+        studyResult.recordset[0];
+
+      /* =====================================================
+         2. GET ALL STUDY IMAGES
+         ===================================================== */
+
+      const imageResult =
+        await pool
+          .request()
+          .input(
+            "studyId",
+            sql.Int,
+            databaseStudyId
+          )
+          .input(
+            "patientId",
+            sql.Int,
+            study.patientId
+          )
+          .input(
+            "userId",
+            sql.Int,
+            userId
+          )
+          .query(`
+            SELECT
+              pi.Id AS id,
+              pi.FileName AS fileName,
+              pi.ContentType AS contentType,
+              pi.ImageOrder AS imageOrder,
+              pi.SeriesId AS seriesId,
+              pi.ImageData AS imageData
+            FROM dbo.PatientImages pi
+            WHERE pi.UserId = @userId
+              AND pi.PatientId = @patientId
+              AND (
+                pi.StudyId = @studyId
+                OR EXISTS (
+                  SELECT 1
+                  FROM dbo.Series sr
+                  WHERE sr.Id = pi.SeriesId
+                    AND sr.StudyId = @studyId
+                    AND sr.PatientId = @patientId
+                )
+              )
+            ORDER BY
+              CASE
+                WHEN pi.ImageOrder IS NULL
+                THEN 2147483647
+                ELSE pi.ImageOrder
+              END,
+              pi.Id ASC
+          `);
+
+      const images =
+        imageResult.recordset || [];
+
+      if (images.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "No images found for this study",
+        });
+      }
+
+      console.log(
+        `AI analysis requested - Study: ${databaseStudyId}, Modality: ${study.modality}, Images: ${images.length}`
+      );
+
+      /* =====================================================
+         3. CONVERT SQL IMAGE DATA TO BASE64
+         ===================================================== */
+
+      const aiImages =
+        images.map((item) => ({
+          id: item.id,
+
+          fileName:
+            item.fileName ||
+            `image-${item.id}`,
+
+          contentType:
+            item.contentType ||
+            "application/octet-stream",
+
+          imageOrder:
+            item.imageOrder,
+
+          seriesId:
+            item.seriesId,
+
+          dataBase64:
+            Buffer
+              .from(item.imageData)
+              .toString("base64"),
+        }));
+
+      /* =====================================================
+         4. CALL PYTHON AI SERVICE
+         ===================================================== */
+
+      const aiResponse =
+        await axios.post(
+          `${process.env.AI_SERVICE_URL ||
+            "http://127.0.0.1:8000"}/api/ai/analyze`,
+          {
+            studyId:
+              study.studyId ||
+              String(databaseStudyId),
+
+            databaseStudyId:
+              databaseStudyId,
+
+            patientId:
+              study.patientId,
+
+            modality:
+              study.modality ||
+              "UNKNOWN",
+
+            bodyPart:
+              study.bodyPart,
+
+            studyDescription:
+              study.studyDescription,
+
+            modelType:
+              "AUTO",
+
+            images:
+              aiImages,
+          },
+          {
+            timeout: 300000,
+
+            maxContentLength:
+              Infinity,
+
+            maxBodyLength:
+              Infinity,
+          }
+        );
+
+      const pythonResponse =
+        aiResponse.data || {};
+
+      /*
+       * Python returns:
+       *
+       * {
+       *   success: true,
+       *   message: "...",
+       *   result: {
+       *      findings: [],
+       *      report: {},
+       *      ...
+       *   }
+       * }
+       */
+
+      const aiResult =
+        pythonResponse.result ||
+        {};
+
+      /* =====================================================
+         5. RETURN FLAT RESULT TO REACT
+         ===================================================== */
+
+      return res.status(200).json({
+        success: true,
+
+        message:
+          "AI analysis completed successfully",
+
+        result: {
+          ...aiResult,
+
+          databaseStudyId:
+            databaseStudyId,
+
+          patientId:
+            study.patientId,
+
+          patientName:
+            study.patientName,
+
+          bodyPart:
+            study.bodyPart,
+
+          studyDescription:
+            study.studyDescription,
+
+          modality:
+            study.modality,
+
+          processedImages:
+            aiResult.processedImages ||
+            images.length,
+
+          metadata: {
+            ...(aiResult.metadata || {}),
+
+            generatedAt:
+              new Date().toISOString(),
+
+            pipeline:
+              "Radiology AI Copilot",
+
+            reviewRequired:
+              true,
+          },
+        },
+      });
+    } catch (error) {
+      console.log(
+        "AI Study Analysis Error"
+      );
+
+      console.log(
+        error.message
+      );
+
+      /* =====================================================
+         PYTHON AI SERVICE ERROR
+         ===================================================== */
+
+      if (
+        error.response &&
+        error.response.data
+      ) {
+        console.log(
+          "Python AI Service Response:",
+          error.response.data
+        );
+
+        return res.status(502).json({
+          success: false,
+
+          message:
+            "Python AI service returned an error",
+
+          aiServiceError:
+            error.response.data,
+        });
+      }
+
+      /* =====================================================
+         PYTHON SERVICE NOT RUNNING
+         ===================================================== */
+
+      if (
+        error.code ===
+        "ECONNREFUSED"
+      ) {
+        return res.status(503).json({
+          success: false,
+
+          message:
+            `AI service is not running. Please start the Python AI service at ${process.env.AI_SERVICE_URL || "http://127.0.0.1:8000"}.`,
+        });
+      }
+
+      /* =====================================================
+         TIMEOUT
+         ===================================================== */
+
+      if (
+        error.code ===
+          "ECONNABORTED" ||
+        error.code ===
+          "ETIMEDOUT"
+      ) {
+        return res.status(504).json({
+          success: false,
+
+          message:
+            "AI service request timed out.",
+        });
+      }
+
+      /* =====================================================
+         GENERAL ERROR
+         ===================================================== */
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          error.message ||
+          "Unable to analyze study",
+      });
+    }
+  }
+);
 
 /* =========================
    REPORTS
@@ -5542,7 +6096,7 @@ app.delete(
 
 app.get(
   "/api/health",
-  async (req, res) => {
+  async (_req, res) => {
     try {
       await pool
         .request()
@@ -5576,9 +6130,10 @@ app.get(
 app.use(
   (
     error,
-    req,
+    _req,
     res,
-    next
+    // Express identifies error handlers by their four parameters.
+    _next
   ) => {
     if (
       error instanceof
