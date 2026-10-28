@@ -290,6 +290,9 @@ const DicomViewport = forwardRef(function DicomViewport(
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  // Cornerstone tools throw on an empty viewport (e.g. wheel-scroll with
+  // no stack), so mouse input is only enabled once a stack is loaded.
+  const [stackLoaded, setStackLoaded] = useState(false);
   const [activeTool, setActiveTool] = useState("WindowLevel");
   const [presetAnchor, setPresetAnchor] = useState(null);
   const [overlay, setOverlay] = useState({});
@@ -473,6 +476,8 @@ const DicomViewport = forwardRef(function DicomViewport(
     const viewport = getViewport();
     if (!viewport) return;
 
+    setStackLoaded(false);
+
     if (imageIds.length === 0) {
       return;
     }
@@ -484,6 +489,7 @@ const DicomViewport = forwardRef(function DicomViewport(
       .then(() => {
         viewport.render();
         refreshOverlay();
+        setStackLoaded(true);
       })
       .catch((stackError) => {
         console.error("Stack loading error:", stackError);
@@ -514,6 +520,15 @@ const DicomViewport = forwardRef(function DicomViewport(
 
   /* ---------- actions ---------- */
 
+  const stackLoadedRef = useRef(false);
+  stackLoadedRef.current = stackLoaded;
+
+  // Viewport actions are no-ops until a stack is displayed.
+  const getLoadedViewport = useCallback(
+    () => (stackLoadedRef.current ? getViewport() : null),
+    [getViewport]
+  );
+
   const selectTool = useCallback((toolId) => {
     const ids = idsRef.current;
     const toolGroup = ids && csTools.ToolGroupManager.getToolGroup(ids.toolGroupId);
@@ -542,7 +557,7 @@ const DicomViewport = forwardRef(function DicomViewport(
 
   const applyPreset = useCallback(
     (preset) => {
-      const viewport = getViewport();
+      const viewport = getLoadedViewport();
       if (!viewport) return;
 
       viewport.setProperties({
@@ -551,69 +566,69 @@ const DicomViewport = forwardRef(function DicomViewport(
       viewport.render();
       setPresetAnchor(null);
     },
-    [getViewport]
+    [getLoadedViewport]
   );
 
   const zoomBy = useCallback(
     (factor) => {
-      const viewport = getViewport();
+      const viewport = getLoadedViewport();
       if (!viewport) return;
 
       viewport.setZoom(viewport.getZoom() * factor);
       viewport.render();
     },
-    [getViewport]
+    [getLoadedViewport]
   );
 
   const rotateBy = useCallback(
     (degrees) => {
-      const viewport = getViewport();
+      const viewport = getLoadedViewport();
       if (!viewport) return;
 
       const current = viewport.getViewPresentation()?.rotation || 0;
       viewport.setViewPresentation({ rotation: (current + degrees + 360) % 360 });
       viewport.render();
     },
-    [getViewport]
+    [getLoadedViewport]
   );
 
   const flipHorizontal = useCallback(() => {
-    const viewport = getViewport();
+    const viewport = getLoadedViewport();
     if (!viewport) return;
 
     viewport.setCamera({ flipHorizontal: !viewport.getCamera().flipHorizontal });
     viewport.render();
-  }, [getViewport]);
+  }, [getLoadedViewport]);
 
   const toggleInvert = useCallback(() => {
-    const viewport = getViewport();
+    const viewport = getLoadedViewport();
     if (!viewport) return;
 
     viewport.setProperties({ invert: !viewport.getProperties().invert });
     viewport.render();
-  }, [getViewport]);
+  }, [getLoadedViewport]);
 
   const reset = useCallback(() => {
-    const viewport = getViewport();
+    const viewport = getLoadedViewport();
     if (!viewport) return;
 
     viewport.resetProperties();
     viewport.resetCamera();
     viewport.render();
-  }, [getViewport]);
+  }, [getLoadedViewport]);
 
   const fit = useCallback(() => {
-    const viewport = getViewport();
+    const viewport = getLoadedViewport();
     if (!viewport) return;
 
     viewport.resetCamera();
     viewport.render();
-  }, [getViewport]);
+  }, [getLoadedViewport]);
 
   const clearMeasurements = useCallback(() => {
     csTools.annotation.state.removeAllAnnotations();
-    getViewport()?.render();
-  }, [getViewport]);
+    getLoadedViewport()?.render();
+  }, [getLoadedViewport]);
 
   useImperativeHandle(
     ref,
@@ -681,7 +696,7 @@ const DicomViewport = forwardRef(function DicomViewport(
         {separator}
 
         {TOOLS.map((item) =>
-          toolbarButton(item.id, item.label, item.icon, () => selectTool(item.id), activeTool === item.id, !ready)
+          toolbarButton(item.id, item.label, item.icon, () => selectTool(item.id), activeTool === item.id, !stackLoaded)
         )}
 
         {separator}
@@ -692,13 +707,13 @@ const DicomViewport = forwardRef(function DicomViewport(
           TuneIcon,
           (event) => setPresetAnchor(event.currentTarget),
           Boolean(presetAnchor),
-          !ready || !isDicomStack
+          !stackLoaded || !isDicomStack
         )}
-        {toolbarButton("invert", "Invert", InvertColorsIcon, toggleInvert, Boolean(overlay.invert), !ready)}
-        {toolbarButton("rotate", "Rotate 90°", RotateRightIcon, () => rotateBy(90), false, !ready)}
-        {toolbarButton("flip", "Flip horizontal", FlipIcon, flipHorizontal, false, !ready)}
-        {toolbarButton("reset", "Reset view", RestartAltIcon, reset, false, !ready)}
-        {toolbarButton("clear", "Clear measurements", DeleteSweepIcon, clearMeasurements, false, !ready)}
+        {toolbarButton("invert", "Invert", InvertColorsIcon, toggleInvert, Boolean(overlay.invert), !stackLoaded)}
+        {toolbarButton("rotate", "Rotate 90°", RotateRightIcon, () => rotateBy(90), false, !stackLoaded)}
+        {toolbarButton("flip", "Flip horizontal", FlipIcon, flipHorizontal, false, !stackLoaded)}
+        {toolbarButton("reset", "Reset view", RestartAltIcon, reset, false, !stackLoaded)}
+        {toolbarButton("clear", "Clear measurements", DeleteSweepIcon, clearMeasurements, false, !stackLoaded)}
 
         <Menu
           anchorEl={presetAnchor}
@@ -732,8 +747,17 @@ const DicomViewport = forwardRef(function DicomViewport(
           overflow: "hidden",
         }}
       >
-        <div ref={elementRef} style={{ position: "absolute", inset: 0 }} />
+        <div
+          ref={elementRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: stackLoaded ? "auto" : "none",
+          }}
+        />
 
+        {stackLoaded && (
+          <>
         {/* TOP LEFT: patient / study */}
         <Box sx={{ position: "absolute", top: 8, left: 10, pointerEvents: "none", zIndex: 2 }}>
           <Typography sx={overlayText}>{patientName}</Typography>
@@ -776,6 +800,9 @@ const DicomViewport = forwardRef(function DicomViewport(
           {overlay.dimensions && <Typography sx={dimText}>{overlay.dimensions}</Typography>}
           <Typography sx={dimText}>{isDicomStack ? "DICOM" : "Image (8-bit)"}</Typography>
         </Box>
+
+          </>
+        )}
 
         {/* ORIENTATION MARKERS */}
         {overlay.letters && (

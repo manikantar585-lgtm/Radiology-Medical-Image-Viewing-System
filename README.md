@@ -1,70 +1,135 @@
-# Getting Started with Create React App
+# Radiology Medical Image Viewing System
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A web-based Radiology Information System (RIS) for managing patients, studies and reports, with an **OHIF-style DICOM viewer** built on Cornerstone3D and an **AI Copilot** that analyses CT, MRI, X-ray, ultrasound and PET studies.
 
-## Available Scripts
+![Image viewer with CT DICOM, measurement and AI analysis](docs/screenshots/viewer-ct-dicom.png)
 
-In the project directory, you can run:
+> ⚠️ **Research / educational project.** AI output is produced by research models, is **not clinically validated**, and must not be used for diagnosis. Every result is labelled for radiologist review.
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Medical image viewer (Cornerstone3D, OHIF-style)
+- Renders **original DICOM pixel data** — real window/level in Hounsfield units
+- CT window presets: **Soft tissue, Lung, Bone, Brain, Liver, Mediastinum**
+- OHIF-style overlays: patient/study info, series description, slice number, thickness and location, W/L and zoom
+- **Orientation markers** (A/P/R/L/H/F) that follow rotation and flip
+- Mouse-wheel slice scrolling and a slice scrollbar
+- Tools: Window/Level, Pan, Zoom, **Length, Angle, Ellipse ROI, Rectangle ROI, Probe** (measurements in mm on DICOM)
+- Invert, rotate, flip, reset, fullscreen; JPG/PNG uploads open in the same viewport
 
-### `npm test`
+### AI Copilot
+| Study | Models |
+|---|---|
+| **CT (DICOM)** | Hounsfield-unit tissue quantification (soft tissue, fat, bone, metal); [TotalSegmentator](https://github.com/wasserth/TotalSegmentator) anatomical segmentation for series with 40+ slices |
+| **All modalities** | [BiomedCLIP](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) zero-shot findings chosen by body region, plus a check that images match the study's modality |
+| **Chest X-ray** | [TorchXRayVision](https://github.com/mlmed/torchxrayvision) — 18 chest pathology scores |
+| **Brain MRI** | ViT brain-tumour classifier (research model) |
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Results appear as findings, quantitative measurements and an editable **AI report draft**.
 
-### `npm run build`
+![AI analysis of a neck CT](docs/screenshots/viewer-ai-analysis.png)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Radiology workflow
+- Login and registration with bcrypt-hashed passwords, per-user data separation
+- Dashboard with patient, study, image and report counts
+- Patients, studies and series management; DICOM / JPG / PNG upload
+- Radiology reports: create, edit and view
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+| Dashboard | Study list |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Study list](docs/screenshots/study-list.png) |
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+![Login](docs/screenshots/login.png)
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Architecture
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```mermaid
+flowchart LR
+    A["React client<br/>MUI + Cornerstone3D<br/>:3000"] -->|REST + x-user-id| B["Node.js / Express API<br/>:5000"]
+    B -->|SQL| C[("Microsoft SQL Server<br/>RadiologyDB")]
+    B -->|DICOM preview + analysis| D["Python AI service<br/>FastAPI :8001"]
+    D --> E["BiomedCLIP · TorchXRayVision<br/>TotalSegmentator · MRI ViT"]
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+| Layer | Tech |
+|---|---|
+| Frontend | React 19, Material UI, Cornerstone3D (`@cornerstonejs/core`, `tools`, `dicom-image-loader`), CRACO |
+| Backend | Node.js, Express 5, `mssql`, `multer`, `bcryptjs` |
+| AI service | Python, FastAPI, PyTorch, pydicom, open_clip, torchxrayvision, TotalSegmentator |
+| Database | Microsoft SQL Server |
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+---
 
-## Learn More
+## Getting started
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.10+
+- Microsoft SQL Server with a database named `RadiologyDB` (tables are created on first start)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### 1. Backend
+```bash
+cd server
+cp .env.example .env      # then fill in your SQL Server credentials
+npm install
+node server.js            # http://localhost:5000
+```
 
-### Code Splitting
+### 2. AI service
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
+pip install -r client/ai-service/requirements.txt
+cd client/ai-service
+python -m uvicorn app:app --host 127.0.0.1 --port 8001
+```
+Model weights (~1 GB: BiomedCLIP, TorchXRayVision, TotalSegmentator) download automatically on first use.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### 3. Frontend
+```bash
+cd client
+npm install
+npm start                 # http://localhost:3000
+```
 
-### Analyzing the Bundle Size
+### Environment variables (`server/.env`)
+| Variable | Example | Purpose |
+|---|---|---|
+| `DB_USER` / `DB_PASSWORD` | — | SQL Server login |
+| `DB_SERVER` | `localhost` | SQL Server host |
+| `DB_NAME` | `RadiologyDB` | Database name |
+| `PORT` | `5000` | API port |
+| `AI_SERVICE_URL` | `http://127.0.0.1:8001` | Python AI service |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## Project structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```
+├── client/                  React app
+│   ├── src/
+│   │   ├── pages/           Dashboard, Studies, Patients, ImageViewer, Reports, Settings
+│   │   └── components/      DicomViewport (Cornerstone3D), AIAnalysisPanel, Layout
+│   ├── ai-service/          FastAPI AI service
+│   │   ├── router.py        /api/ai/analyze, /api/ai/render-dicom
+│   │   ├── ct_model.py      HU quantification + TotalSegmentator
+│   │   ├── vision_models.py BiomedCLIP + TorchXRayVision
+│   │   └── mri_model.py     MRI brain-tumour classifier
+│   └── craco.config.js      Webpack overrides for Cornerstone codecs
+├── server/                  Express API (server.js) + .env.example
+└── docs/screenshots/
+```
 
-### Advanced Configuration
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## Notes
+- For full viewer functionality (HU windowing, mm measurements, orientation) upload **original `.dcm` files**. JPG/PNG exports display but carry no CT values or pixel spacing.
+- AI runs on CPU; a study typically takes 5–30 seconds.
+- Screenshots use demo / anonymised patient names.
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Author
+**Manikanta Reddy** — Radiology Medical Image Viewing System, version 1.0
