@@ -48,7 +48,6 @@ import { API_URL, authHeaders } from "../api/http";
    window/level); JPG/PNG uploads load through a web loader.
 ========================================================= */
 
-
 const COLORS = {
   background: "#000000",
   toolbar: "#090c29",
@@ -76,13 +75,22 @@ const TOOLS = [
   { id: "Zoom", label: "Zoom", icon: ZoomInIcon, tool: csTools.ZoomTool },
   { id: "Length", label: "Length", icon: StraightenIcon, tool: csTools.LengthTool },
   { id: "Angle", label: "Angle", icon: SquareFootIcon, tool: csTools.AngleTool },
-  { id: "EllipticalROI", label: "Ellipse ROI", icon: RadioButtonUncheckedIcon, tool: csTools.EllipticalROITool },
-  { id: "RectangleROI", label: "Rectangle ROI", icon: CropSquareIcon, tool: csTools.RectangleROITool },
+  {
+    id: "EllipticalROI",
+    label: "Ellipse ROI",
+    icon: RadioButtonUncheckedIcon,
+    tool: csTools.EllipticalROITool,
+  },
+  {
+    id: "RectangleROI",
+    label: "Rectangle ROI",
+    icon: CropSquareIcon,
+    tool: csTools.RectangleROITool,
+  },
   { id: "Probe", label: "Probe (pixel value)", icon: MyLocationIcon, tool: csTools.ProbeTool },
 ];
 
-const toolName = (id) =>
-  TOOLS.find((item) => item.id === id).tool.toolName;
+const toolName = (id) => TOOLS.find((item) => item.id === id).tool.toolName;
 
 export function isDicomImage(image) {
   const name = String(image?.fileName || "").toLowerCase();
@@ -92,10 +100,7 @@ export function isDicomImage(image) {
     return true;
   }
 
-  return (
-    type === "application/octet-stream" &&
-    !/\.(png|jpe?g|gif|bmp|webp)$/.test(name)
-  );
+  return type === "application/octet-stream" && !/\.(png|jpe?g|gif|bmp|webp)$/.test(name);
 }
 
 function toImageId(image) {
@@ -257,11 +262,7 @@ function orientationLetters(vector) {
 }
 
 function cross(a, b) {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 const negate = (vector) => vector.map((value) => -value);
@@ -273,7 +274,17 @@ let mountCounter = 0;
 ========================================================= */
 
 const DicomViewport = forwardRef(function DicomViewport(
-  { images, index, onIndexChange, patientName, patientId, studyDate, studyLabel, modality, bodyPart },
+  {
+    images,
+    index,
+    onIndexChange,
+    patientName,
+    patientId,
+    studyDate,
+    studyLabel,
+    modality,
+    bodyPart,
+  },
   ref
 ) {
   const elementRef = useRef(null);
@@ -319,7 +330,11 @@ const DicomViewport = forwardRef(function DicomViewport(
 
     let letters = null;
 
-    if (isDicomImage(images[viewport.getCurrentImageIdIndex()]) && camera.viewUp && camera.viewPlaneNormal) {
+    if (
+      isDicomImage(images[viewport.getCurrentImageIdIndex()]) &&
+      camera.viewUp &&
+      camera.viewPlaneNormal
+    ) {
       const right = cross(camera.viewUp, camera.viewPlaneNormal);
 
       letters = {
@@ -339,9 +354,7 @@ const DicomViewport = forwardRef(function DicomViewport(
       seriesNumber: series.seriesNumber,
       sliceThickness: plane.sliceThickness,
       sliceLocation: plane.sliceLocation,
-      dimensions: image?.dimensions
-        ? `${image.dimensions[0]} × ${image.dimensions[1]}`
-        : null,
+      dimensions: image?.dimensions ? `${image.dimensions[0]} × ${image.dimensions[1]}` : null,
       letters,
     });
   }, [getViewport, images]);
@@ -400,8 +413,8 @@ const DicomViewport = forwardRef(function DicomViewport(
           bindings: [{ mouseButton: MouseBindings.Wheel }],
         });
 
-        TOOLS.filter((item) => !["WindowLevel", "Pan", "Zoom"].includes(item.id)).forEach(
-          (item) => toolGroup.setToolPassive(item.tool.toolName)
+        TOOLS.filter((item) => !["WindowLevel", "Pan", "Zoom"].includes(item.id)).forEach((item) =>
+          toolGroup.setToolPassive(item.tool.toolName)
         );
 
         idsRef.current = ids;
@@ -622,11 +635,14 @@ const DicomViewport = forwardRef(function DicomViewport(
     getLoadedViewport()?.render();
   }, [getLoadedViewport]);
 
-  useImperativeHandle(
-    ref,
-    () => ({ zoomBy, rotateBy, reset, fit, flipHorizontal, toggleInvert }),
-    [zoomBy, rotateBy, reset, fit, flipHorizontal, toggleInvert]
-  );
+  useImperativeHandle(ref, () => ({ zoomBy, rotateBy, reset, fit, flipHorizontal, toggleInvert }), [
+    zoomBy,
+    rotateBy,
+    reset,
+    fit,
+    flipHorizontal,
+    toggleInvert,
+  ]);
 
   /* ---------- render ---------- */
 
@@ -654,15 +670,32 @@ const DicomViewport = forwardRef(function DicomViewport(
   );
 
   const separator = (
-    <Divider orientation="vertical" flexItem sx={{ mx: 0.6, my: 0.9, borderColor: COLORS.border }} />
+    <Divider
+      orientation="vertical"
+      flexItem
+      sx={{ mx: 0.6, my: 0.9, borderColor: COLORS.border }}
+    />
   );
 
-  const overlayText = { fontSize: 12, lineHeight: 1.45, color: COLORS.overlay, textShadow: "0 0 3px #000" };
+  const overlayText = {
+    fontSize: 12,
+    lineHeight: 1.45,
+    color: COLORS.overlay,
+    textShadow: "0 0 3px #000",
+  };
   const dimText = { ...overlayText, color: COLORS.overlayDim };
   const position = index >= 0 ? index + 1 : 0;
 
   return (
-    <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", backgroundColor: COLORS.background }}>
+    <Box
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: COLORS.background,
+      }}
+    >
       {/* TOOLBAR */}
 
       <Box
@@ -677,18 +710,47 @@ const DicomViewport = forwardRef(function DicomViewport(
           overflowX: "auto",
         }}
       >
-        {toolbarButton("prev", "Previous image", NavigateBeforeIcon, () => onIndexChange?.(index - 1), false, index <= 0)}
+        {toolbarButton(
+          "prev",
+          "Previous image",
+          NavigateBeforeIcon,
+          () => onIndexChange?.(index - 1),
+          false,
+          index <= 0
+        )}
 
-        <Typography sx={{ minWidth: 54, textAlign: "center", fontSize: 12, fontWeight: 700, color: COLORS.overlay }}>
+        <Typography
+          sx={{
+            minWidth: 54,
+            textAlign: "center",
+            fontSize: 12,
+            fontWeight: 700,
+            color: COLORS.overlay,
+          }}
+        >
           {position} / {images.length}
         </Typography>
 
-        {toolbarButton("next", "Next image", NavigateNextIcon, () => onIndexChange?.(index + 1), false, index >= images.length - 1)}
+        {toolbarButton(
+          "next",
+          "Next image",
+          NavigateNextIcon,
+          () => onIndexChange?.(index + 1),
+          false,
+          index >= images.length - 1
+        )}
 
         {separator}
 
         {TOOLS.map((item) =>
-          toolbarButton(item.id, item.label, item.icon, () => selectTool(item.id), activeTool === item.id, !stackLoaded)
+          toolbarButton(
+            item.id,
+            item.label,
+            item.icon,
+            () => selectTool(item.id),
+            activeTool === item.id,
+            !stackLoaded
+          )
         )}
 
         {separator}
@@ -701,22 +763,53 @@ const DicomViewport = forwardRef(function DicomViewport(
           Boolean(presetAnchor),
           !stackLoaded || !isDicomStack
         )}
-        {toolbarButton("invert", "Invert", InvertColorsIcon, toggleInvert, Boolean(overlay.invert), !stackLoaded)}
-        {toolbarButton("rotate", "Rotate 90°", RotateRightIcon, () => rotateBy(90), false, !stackLoaded)}
+        {toolbarButton(
+          "invert",
+          "Invert",
+          InvertColorsIcon,
+          toggleInvert,
+          Boolean(overlay.invert),
+          !stackLoaded
+        )}
+        {toolbarButton(
+          "rotate",
+          "Rotate 90°",
+          RotateRightIcon,
+          () => rotateBy(90),
+          false,
+          !stackLoaded
+        )}
         {toolbarButton("flip", "Flip horizontal", FlipIcon, flipHorizontal, false, !stackLoaded)}
         {toolbarButton("reset", "Reset view", RestartAltIcon, reset, false, !stackLoaded)}
-        {toolbarButton("clear", "Clear measurements", DeleteSweepIcon, clearMeasurements, false, !stackLoaded)}
+        {toolbarButton(
+          "clear",
+          "Clear measurements",
+          DeleteSweepIcon,
+          clearMeasurements,
+          false,
+          !stackLoaded
+        )}
 
         <Menu
           anchorEl={presetAnchor}
           open={Boolean(presetAnchor)}
           onClose={() => setPresetAnchor(null)}
           slotProps={{
-            paper: { sx: { backgroundColor: COLORS.toolbar, color: COLORS.overlay, border: `1px solid ${COLORS.border}` } },
+            paper: {
+              sx: {
+                backgroundColor: COLORS.toolbar,
+                color: COLORS.overlay,
+                border: `1px solid ${COLORS.border}`,
+              },
+            },
           }}
         >
           {CT_PRESETS.map((preset) => (
-            <MenuItem key={preset.name} onClick={() => applyPreset(preset)} sx={{ fontSize: 13, gap: 2 }}>
+            <MenuItem
+              key={preset.name}
+              onClick={() => applyPreset(preset)}
+              sx={{ fontSize: 13, gap: 2 }}
+            >
               <span style={{ flex: 1 }}>{preset.name}</span>
               <span style={{ color: COLORS.overlayDim, fontSize: 11 }}>
                 W {preset.width} · L {preset.center}
@@ -750,65 +843,129 @@ const DicomViewport = forwardRef(function DicomViewport(
 
         {stackLoaded && (
           <>
-        {/* TOP LEFT: patient / study */}
-        <Box sx={{ position: "absolute", top: 8, left: 10, pointerEvents: "none", zIndex: 2 }}>
-          <Typography sx={overlayText}>{patientName}</Typography>
-          {patientId && <Typography sx={dimText}>ID: {patientId}</Typography>}
-          {studyDate && <Typography sx={dimText}>{studyDate}</Typography>}
-          {(overlay.seriesDescription || studyLabel) && (
-            <Typography sx={dimText}>{overlay.seriesDescription || studyLabel}</Typography>
-          )}
-        </Box>
+            {/* TOP LEFT: patient / study */}
+            <Box sx={{ position: "absolute", top: 8, left: 10, pointerEvents: "none", zIndex: 2 }}>
+              <Typography sx={overlayText}>{patientName}</Typography>
+              {patientId && <Typography sx={dimText}>ID: {patientId}</Typography>}
+              {studyDate && <Typography sx={dimText}>{studyDate}</Typography>}
+              {(overlay.seriesDescription || studyLabel) && (
+                <Typography sx={dimText}>{overlay.seriesDescription || studyLabel}</Typography>
+              )}
+            </Box>
 
-        {/* TOP RIGHT: modality / image */}
-        <Box sx={{ position: "absolute", top: 8, right: 26, textAlign: "right", pointerEvents: "none", zIndex: 2 }}>
-          <Typography sx={overlayText}>
-            {modality}
-            {bodyPart ? ` · ${bodyPart}` : ""}
-          </Typography>
-          <Typography sx={dimText}>
-            {overlay.seriesNumber ? `S: ${overlay.seriesNumber}  ` : ""}I: {position} / {images.length}
-          </Typography>
-          {overlay.sliceThickness != null && (
-            <Typography sx={dimText}>Thick: {Number(overlay.sliceThickness).toFixed(1)} mm</Typography>
-          )}
-          {overlay.sliceLocation != null && (
-            <Typography sx={dimText}>Loc: {Number(overlay.sliceLocation).toFixed(1)} mm</Typography>
-          )}
-        </Box>
+            {/* TOP RIGHT: modality / image */}
+            <Box
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 26,
+                textAlign: "right",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
+              <Typography sx={overlayText}>
+                {modality}
+                {bodyPart ? ` · ${bodyPart}` : ""}
+              </Typography>
+              <Typography sx={dimText}>
+                {overlay.seriesNumber ? `S: ${overlay.seriesNumber}  ` : ""}I: {position} /{" "}
+                {images.length}
+              </Typography>
+              {overlay.sliceThickness != null && (
+                <Typography sx={dimText}>
+                  Thick: {Number(overlay.sliceThickness).toFixed(1)} mm
+                </Typography>
+              )}
+              {overlay.sliceLocation != null && (
+                <Typography sx={dimText}>
+                  Loc: {Number(overlay.sliceLocation).toFixed(1)} mm
+                </Typography>
+              )}
+            </Box>
 
-        {/* BOTTOM LEFT: window / zoom */}
-        <Box sx={{ position: "absolute", bottom: 8, left: 10, pointerEvents: "none", zIndex: 2 }}>
-          {overlay.windowWidth != null && (
-            <Typography sx={overlayText}>
-              W: {overlay.windowWidth} L: {overlay.windowCenter}
-            </Typography>
-          )}
-          <Typography sx={dimText}>Zoom: {(overlay.zoom || 1).toFixed(2)}x</Typography>
-        </Box>
+            {/* BOTTOM LEFT: window / zoom */}
+            <Box
+              sx={{ position: "absolute", bottom: 8, left: 10, pointerEvents: "none", zIndex: 2 }}
+            >
+              {overlay.windowWidth != null && (
+                <Typography sx={overlayText}>
+                  W: {overlay.windowWidth} L: {overlay.windowCenter}
+                </Typography>
+              )}
+              <Typography sx={dimText}>Zoom: {(overlay.zoom || 1).toFixed(2)}x</Typography>
+            </Box>
 
-        {/* BOTTOM RIGHT: dimensions */}
-        <Box sx={{ position: "absolute", bottom: 8, right: 26, textAlign: "right", pointerEvents: "none", zIndex: 2 }}>
-          {overlay.dimensions && <Typography sx={dimText}>{overlay.dimensions}</Typography>}
-          <Typography sx={dimText}>{isDicomStack ? "DICOM" : "Image (8-bit)"}</Typography>
-        </Box>
-
+            {/* BOTTOM RIGHT: dimensions */}
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 8,
+                right: 26,
+                textAlign: "right",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
+              {overlay.dimensions && <Typography sx={dimText}>{overlay.dimensions}</Typography>}
+              <Typography sx={dimText}>{isDicomStack ? "DICOM" : "Image (8-bit)"}</Typography>
+            </Box>
           </>
         )}
 
         {/* ORIENTATION MARKERS */}
         {overlay.letters && (
           <>
-            <Typography sx={{ ...overlayText, position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", pointerEvents: "none", zIndex: 2 }}>
+            <Typography
+              sx={{
+                ...overlayText,
+                position: "absolute",
+                top: 8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
               {overlay.letters.top}
             </Typography>
-            <Typography sx={{ ...overlayText, position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", pointerEvents: "none", zIndex: 2 }}>
+            <Typography
+              sx={{
+                ...overlayText,
+                position: "absolute",
+                bottom: 8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
               {overlay.letters.bottom}
             </Typography>
-            <Typography sx={{ ...overlayText, position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+            <Typography
+              sx={{
+                ...overlayText,
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
               {overlay.letters.left}
             </Typography>
-            <Typography sx={{ ...overlayText, position: "absolute", right: 26, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 2 }}>
+            <Typography
+              sx={{
+                ...overlayText,
+                position: "absolute",
+                right: 26,
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
               {overlay.letters.right}
             </Typography>
           </>
@@ -837,7 +994,16 @@ const DicomViewport = forwardRef(function DicomViewport(
         )}
 
         {(error || images.length === 0) && (
-          <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+            }}
+          >
             <Typography sx={{ color: "#6b7fa3", fontSize: 13 }}>
               {error || "No medical images found"}
             </Typography>
@@ -859,7 +1025,8 @@ const DicomViewport = forwardRef(function DicomViewport(
         }}
       >
         <Typography sx={{ fontSize: 10, color: COLORS.overlayDim }}>
-          Left: {TOOLS.find((item) => item.id === activeTool)?.label} • Middle: Pan • Right: Zoom • Wheel: Scroll slices
+          Left: {TOOLS.find((item) => item.id === activeTool)?.label} • Middle: Pan • Right: Zoom •
+          Wheel: Scroll slices
         </Typography>
       </Box>
     </Box>

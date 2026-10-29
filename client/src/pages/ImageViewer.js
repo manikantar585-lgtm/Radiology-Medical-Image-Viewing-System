@@ -1,14 +1,6 @@
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import AIAnalysisPanel from "../components/AIAnalysisPanel";
 import DicomViewport from "../components/DicomViewport";
@@ -37,78 +29,9 @@ import PersonIcon from "@mui/icons-material/Person";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
-import { API_URL, authHeaders, getStoredUser, jsonHeaders } from "../api/http";
-
-const DEFAULT_HOTKEYS = {
-  zoomIn: "+",
-  zoomOut: "-",
-  reset: "Space",
-  rotateRight: "R",
-  rotateLeft: "L",
-  firstImage: "Home",
-  lastImage: "End",
-  nextImage: "ArrowDown",
-  previousImage: "ArrowUp",
-  cancel: "Escape",
-};
-
-function getUserId() {
-  return getStoredUser()?.id || null;
-}
-
-const getJsonHeaders = jsonHeaders;
-const getImageHeaders = authHeaders;
-
-function normalizeHotkey(value) {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase();
-
-  if (normalized === "space") {
-    return " ";
-  }
-
-  if (normalized === "esc") {
-    return "escape";
-  }
-
-  return normalized;
-}
-
-function getSavedHotkeys() {
-  try {
-    const saved = localStorage.getItem("radiologyHotkeys");
-
-    if (!saved) {
-      return DEFAULT_HOTKEYS;
-    }
-
-    return {
-      ...DEFAULT_HOTKEYS,
-      ...JSON.parse(saved),
-    };
-  } catch (error) {
-    return DEFAULT_HOTKEYS;
-  }
-}
-
-function formatDate(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { API_URL, authHeaders, jsonHeaders, getCurrentUserId } from "../api/http";
+import { formatDate } from "../utils/format";
+import { getSavedHotkeys, normalizeHotkey } from "../utils/hotkeys";
 
 function getModality(value) {
   const modality = String(value || "").toUpperCase();
@@ -121,18 +44,11 @@ function getModality(value) {
     return "MR";
   }
 
-  if (
-    modality.includes("X-RAY") ||
-    modality.includes("XRAY") ||
-    modality === "XR"
-  ) {
+  if (modality.includes("X-RAY") || modality.includes("XRAY") || modality === "XR") {
     return "XR";
   }
 
-  if (
-    modality.includes("ULTRASOUND") ||
-    modality === "US"
-  ) {
+  if (modality.includes("ULTRASOUND") || modality === "US") {
     return "US";
   }
 
@@ -153,80 +69,41 @@ function ImageViewer() {
   const [images, setImages] = useState([]);
   const [series, setSeries] = useState(null);
 
-  const [selectedImageId, setSelectedImageId] =
-    useState(null);
+  const [selectedImageId, setSelectedImageId] = useState(null);
 
-  const [thumbnailUrls, setThumbnailUrls] =
-    useState({});
+  const [thumbnailUrls, setThumbnailUrls] = useState({});
 
-  const [uploading, setUploading] =
-    useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  const [deleting, setDeleting] =
-    useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const [analysisStatus, setAnalysisStatus] =
-    useState("idle");
+  const [analysisStatus, setAnalysisStatus] = useState("idle");
 
-  const [aiResult, setAiResult] =
-    useState(null);
+  const [aiResult, setAiResult] = useState(null);
 
-  const [aiFindings, setAiFindings] =
-    useState([]);
+  const [aiFindings, setAiFindings] = useState([]);
 
   const viewerRef = useRef(null);
   const dicomViewportRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const thumbnailCacheRef =
-    useRef({});
+  const thumbnailCacheRef = useRef({});
 
-  const hotkeys =
-    useState(getSavedHotkeys())[0];
+  const hotkeys = useState(getSavedHotkeys())[0];
 
-  const currentIndex =
-    images.findIndex(
-      (item) =>
-        Number(item.id) ===
-        Number(selectedImageId)
-    );
+  const currentIndex = images.findIndex((item) => Number(item.id) === Number(selectedImageId));
 
-  const selectedImage =
-    images.find(
-      (item) =>
-        Number(item.id) ===
-        Number(selectedImageId)
-    );
+  const selectedImage = images.find((item) => Number(item.id) === Number(selectedImageId));
 
-  const modality =
-    getModality(
-      study?.modality ||
-        series?.modality
-    );
+  const modality = getModality(study?.modality || series?.modality);
 
-  const patientName =
-    patient?.name ||
-    patient?.Name ||
-    patient?.patientName ||
-    "Unknown Patient";
+  const patientName = patient?.name || patient?.Name || patient?.patientName || "Unknown Patient";
 
-  const patientId =
-    patient?.id ||
-    patient?.Id ||
-    patient?.patientId ||
-    "-";
+  const patientId = patient?.id || patient?.Id || patient?.patientId || "-";
 
-  const studyId =
-    study?.studyId ||
-    study?.StudyId ||
-    study?.id ||
-    study?.Id ||
-    "-";
+  const studyId = study?.studyId || study?.StudyId || study?.id || study?.Id || "-";
 
-  const bodyPart =
-    study?.bodyPart ||
-    study?.BodyPart ||
-    "Not specified";
+  const bodyPart = study?.bodyPart || study?.BodyPart || "Not specified";
 
   const studyDescription =
     study?.studyDescription ||
@@ -234,11 +111,7 @@ function ImageViewer() {
     series?.seriesDescription ||
     "Medical Imaging Study";
 
-  const studyDate =
-    formatDate(
-      study?.studyDate ||
-        study?.StudyDate
-    );
+  const studyDate = formatDate(study?.studyDate || study?.StudyDate);
 
   const resetViewer = useCallback(() => {
     dicomViewportRef.current?.reset();
@@ -260,240 +133,145 @@ function ImageViewer() {
     dicomViewportRef.current?.rotateBy(-90);
   }, []);
 
-  const selectImageByIndex =
-    useCallback(
-      (index) => {
-        if (
-          index < 0 ||
-          index >= images.length
-        ) {
-          return;
-        }
-
-        setSelectedImageId(
-          images[index].id
-        );
-      },
-      [images]
-    );
-
-  const firstImage =
-    useCallback(() => {
-      selectImageByIndex(0);
-    }, [selectImageByIndex]);
-
-  const lastImage =
-    useCallback(() => {
-      selectImageByIndex(
-        images.length - 1
-      );
-    }, [
-      images.length,
-      selectImageByIndex,
-    ]);
-
-  const nextImage =
-    useCallback(() => {
-      if (
-        currentIndex >= 0 &&
-        currentIndex < images.length - 1
-      ) {
-        selectImageByIndex(
-          currentIndex + 1
-        );
-      }
-    }, [
-      currentIndex,
-      images.length,
-      selectImageByIndex,
-    ]);
-
-  const previousImage =
-    useCallback(() => {
-      if (currentIndex > 0) {
-        selectImageByIndex(
-          currentIndex - 1
-        );
-      }
-    }, [
-      currentIndex,
-      selectImageByIndex,
-    ]);
-
-  const loadStudyImages =
-    useCallback(async () => {
-      if (
-        !patient?.id ||
-        !study?.id
-      ) {
-        setImages([]);
-        setSeries(null);
-        setSelectedImageId(null);
+  const selectImageByIndex = useCallback(
+    (index) => {
+      if (index < 0 || index >= images.length) {
         return;
       }
 
-      const userId = getUserId();
+      setSelectedImageId(images[index].id);
+    },
+    [images]
+  );
 
-      if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
-        navigate("/");
-        return;
-      }
+  const firstImage = useCallback(() => {
+    selectImageByIndex(0);
+  }, [selectImageByIndex]);
+
+  const lastImage = useCallback(() => {
+    selectImageByIndex(images.length - 1);
+  }, [images.length, selectImageByIndex]);
+
+  const nextImage = useCallback(() => {
+    if (currentIndex >= 0 && currentIndex < images.length - 1) {
+      selectImageByIndex(currentIndex + 1);
+    }
+  }, [currentIndex, images.length, selectImageByIndex]);
+
+  const previousImage = useCallback(() => {
+    if (currentIndex > 0) {
+      selectImageByIndex(currentIndex - 1);
+    }
+  }, [currentIndex, selectImageByIndex]);
+
+  const loadStudyImages = useCallback(async () => {
+    if (!patient?.id || !study?.id) {
+      setImages([]);
+      setSeries(null);
+      setSelectedImageId(null);
+      return;
+    }
+
+    const userId = getCurrentUserId();
+
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
+      navigate("/");
+      return;
+    }
+
+    try {
+      let loadedSeries = null;
 
       try {
-        let loadedSeries = null;
-
-        try {
-          const seriesResponse =
-            await fetch(
-              `${API_URL}/api/series?patientId=${patient.id}&studyId=${study.id}`,
-              {
-                method: "GET",
-                headers: getJsonHeaders(),
-              }
-            );
-
-          if (seriesResponse.ok) {
-            const seriesData =
-              await seriesResponse.json();
-
-            if (
-              Array.isArray(
-                seriesData?.series
-              )
-            ) {
-              loadedSeries =
-                seriesData.series[0] ||
-                null;
-            } else {
-              loadedSeries =
-                seriesData?.series ||
-                null;
-            }
-          }
-        } catch (error) {
-          console.warn(
-            "Series loading warning:",
-            error
-          );
-        }
-
-        setSeries(loadedSeries);
-
-        let url =
-          `${API_URL}/api/images?patientId=${patient.id}&studyId=${study.id}`;
-
-        if (loadedSeries?.id) {
-          url +=
-            `&seriesId=${loadedSeries.id}`;
-        }
-
-        let response =
-          await fetch(
-            url,
-            {
-              method: "GET",
-              headers: getJsonHeaders(),
-            }
-          );
-
-        let data = {};
-
-        if (response.ok) {
-          data =
-            await response.json();
-        }
-
-        let loadedImages =
-          Array.isArray(data?.images)
-            ? data.images
-            : [];
-
-        if (
-          loadedImages.length === 0 &&
-          loadedSeries?.id
-        ) {
-          const fallback =
-            await fetch(
-              `${API_URL}/api/images?patientId=${patient.id}&studyId=${study.id}`,
-              {
-                method: "GET",
-                headers: getJsonHeaders(),
-              }
-            );
-
-          if (fallback.ok) {
-            const fallbackData =
-              await fallback.json();
-
-            loadedImages =
-              Array.isArray(
-                fallbackData?.images
-              )
-                ? fallbackData.images
-                : [];
-          }
-        }
-
-        loadedImages.sort(
-          (a, b) => {
-            const orderA =
-              Number(
-                a?.imageOrder ??
-                  a?.ImageOrder ??
-                  0
-              );
-
-            const orderB =
-              Number(
-                b?.imageOrder ??
-                  b?.ImageOrder ??
-                  0
-              );
-
-            if (orderA !== orderB) {
-              return orderA - orderB;
-            }
-
-            return (
-              Number(a?.id || 0) -
-              Number(b?.id || 0)
-            );
+        const seriesResponse = await fetch(
+          `${API_URL}/api/series?patientId=${patient.id}&studyId=${study.id}`,
+          {
+            method: "GET",
+            headers: jsonHeaders(),
           }
         );
 
-        setImages(loadedImages);
-        setThumbnailUrls({});
+        if (seriesResponse.ok) {
+          const seriesData = await seriesResponse.json();
 
-        if (loadedImages.length > 0) {
-          setSelectedImageId(
-            loadedImages[0].id
-          );
-        } else {
-          setSelectedImageId(null);
+          if (Array.isArray(seriesData?.series)) {
+            loadedSeries = seriesData.series[0] || null;
+          } else {
+            loadedSeries = seriesData?.series || null;
+          }
         }
       } catch (error) {
-        console.error(
-          "Study image loading error:",
-          error
-        );
-
-        setImages([]);
-        setSeries(null);
-        setSelectedImageId(null);
-
-        alert(
-          error?.message ||
-            "Unable to load study images."
-        );
+        console.warn("Series loading warning:", error);
       }
-    }, [
-      patient?.id,
-      study?.id,
-      navigate,
-    ]);
+
+      setSeries(loadedSeries);
+
+      let url = `${API_URL}/api/images?patientId=${patient.id}&studyId=${study.id}`;
+
+      if (loadedSeries?.id) {
+        url += `&seriesId=${loadedSeries.id}`;
+      }
+
+      let response = await fetch(url, {
+        method: "GET",
+        headers: jsonHeaders(),
+      });
+
+      let data = {};
+
+      if (response.ok) {
+        data = await response.json();
+      }
+
+      let loadedImages = Array.isArray(data?.images) ? data.images : [];
+
+      if (loadedImages.length === 0 && loadedSeries?.id) {
+        const fallback = await fetch(
+          `${API_URL}/api/images?patientId=${patient.id}&studyId=${study.id}`,
+          {
+            method: "GET",
+            headers: jsonHeaders(),
+          }
+        );
+
+        if (fallback.ok) {
+          const fallbackData = await fallback.json();
+
+          loadedImages = Array.isArray(fallbackData?.images) ? fallbackData.images : [];
+        }
+      }
+
+      loadedImages.sort((a, b) => {
+        const orderA = Number(a?.imageOrder ?? a?.ImageOrder ?? 0);
+
+        const orderB = Number(b?.imageOrder ?? b?.ImageOrder ?? 0);
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        return Number(a?.id || 0) - Number(b?.id || 0);
+      });
+
+      setImages(loadedImages);
+      setThumbnailUrls({});
+
+      if (loadedImages.length > 0) {
+        setSelectedImageId(loadedImages[0].id);
+      } else {
+        setSelectedImageId(null);
+      }
+    } catch (error) {
+      console.error("Study image loading error:", error);
+
+      setImages([]);
+      setSeries(null);
+      setSelectedImageId(null);
+
+      alert(error?.message || "Unable to load study images.");
+    }
+  }, [patient?.id, study?.id, navigate]);
 
   useEffect(() => {
     loadStudyImages();
@@ -511,67 +289,42 @@ function ImageViewer() {
       const nextUrls = {};
 
       await Promise.all(
-        images.map(
-          async (item) => {
-            if (cancelled) {
-              return;
-            }
-
-            if (
-              thumbnailCacheRef
-                .current[item.id]
-            ) {
-              nextUrls[item.id] =
-                thumbnailCacheRef
-                  .current[item.id];
-
-              return;
-            }
-
-            try {
-              const response =
-                await fetch(
-                  `${API_URL}/api/images/${item.id}/preview`,
-                  {
-                    method: "GET",
-                    headers:
-                      getImageHeaders(),
-                  }
-                );
-
-              if (!response.ok) {
-                return;
-              }
-
-              const blob =
-                await response.blob();
-
-              const url =
-                URL.createObjectURL(
-                  blob
-                );
-
-              thumbnailCacheRef
-                .current[item.id] =
-                url;
-
-              nextUrls[item.id] =
-                url;
-            } catch (error) {
-              console.warn(
-                "Thumbnail loading warning:",
-                item.id,
-                error
-              );
-            }
+        images.map(async (item) => {
+          if (cancelled) {
+            return;
           }
-        )
+
+          if (thumbnailCacheRef.current[item.id]) {
+            nextUrls[item.id] = thumbnailCacheRef.current[item.id];
+
+            return;
+          }
+
+          try {
+            const response = await fetch(`${API_URL}/api/images/${item.id}/preview`, {
+              method: "GET",
+              headers: authHeaders(),
+            });
+
+            if (!response.ok) {
+              return;
+            }
+
+            const blob = await response.blob();
+
+            const url = URL.createObjectURL(blob);
+
+            thumbnailCacheRef.current[item.id] = url;
+
+            nextUrls[item.id] = url;
+          } catch (error) {
+            console.warn("Thumbnail loading warning:", item.id, error);
+          }
+        })
       );
 
       if (!cancelled) {
-        setThumbnailUrls(
-          nextUrls
-        );
+        setThumbnailUrls(nextUrls);
       }
     }
 
@@ -588,619 +341,363 @@ function ImageViewer() {
         patient,
       },
     });
-  }, [
-    navigate,
-    patient,
-  ]);
+  }, [navigate, patient]);
 
-  const handleFullscreen =
-    useCallback(async () => {
-      try {
-        if (
-          !document.fullscreenElement
-        ) {
-          await viewerRef.current?.requestFullscreen();
-        } else {
-          await document.exitFullscreen();
-        }
-      } catch (error) {
-        console.error(
-          "Fullscreen error:",
-          error
-        );
+  const handleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await viewerRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
       }
-    }, []);
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+    }
+  }, []);
 
-  const handleUpload =
-    useCallback(
-      async (event) => {
-        const selectedFiles =
-          Array.from(
-            event.target.files || []
-          );
+  const handleUpload = useCallback(
+    async (event) => {
+      const selectedFiles = Array.from(event.target.files || []);
 
-        if (
-          selectedFiles.length === 0
-        ) {
-          return;
-        }
-
-        if (
-          !patient?.id ||
-          !study?.id
-        ) {
-          alert(
-            "Patient and study information are required."
-          );
-
-          event.target.value = "";
-          return;
-        }
-
-        const userId =
-          getUserId();
-
-        if (!userId) {
-          alert(
-            "Your login session was not found. Please login again."
-          );
-
-          navigate("/");
-          return;
-        }
-
-        try {
-          setUploading(true);
-
-          const formData =
-            new FormData();
-
-          selectedFiles.forEach(
-            (file) => {
-              formData.append(
-                "images",
-                file
-              );
-            }
-          );
-
-          formData.append(
-            "patientId",
-            String(patient.id)
-          );
-
-          formData.append(
-            "studyId",
-            String(study.id)
-          );
-
-          formData.append(
-            "seriesNumber",
-            String(
-              series?.seriesNumber ||
-                1
-            )
-          );
-
-          formData.append(
-            "seriesDescription",
-            series?.seriesDescription ||
-              `${modality} Image Series`
-          );
-
-          formData.append(
-            "modality",
-            study?.modality ||
-              "OT"
-          );
-
-          const response =
-            await fetch(
-              `${API_URL}/api/series/upload`,
-              {
-                method: "POST",
-                headers: {
-                  ...authHeaders(),
-                },
-                body: formData,
-              }
-            );
-
-          let data = {};
-
-          try {
-            data =
-              await response.json();
-          } catch (error) {
-            data = {};
-          }
-
-          if (!response.ok) {
-            throw new Error(
-              data?.message ||
-                "Unable to upload images."
-            );
-          }
-
-          await loadStudyImages();
-
-          alert(
-            `${selectedFiles.length} image${
-              selectedFiles.length ===
-              1
-                ? ""
-                : "s"
-            } uploaded successfully.`
-          );
-        } catch (error) {
-          console.error(
-            "Upload error:",
-            error
-          );
-
-          alert(
-            error?.message ||
-              "Unable to upload images."
-          );
-        } finally {
-          setUploading(false);
-          event.target.value = "";
-        }
-      },
-      [
-        patient?.id,
-        study?.id,
-        series?.seriesNumber,
-        series?.seriesDescription,
-        study?.modality,
-        modality,
-        navigate,
-        loadStudyImages,
-      ]
-    );
-
-  const handleDownload =
-    useCallback(async () => {
-      if (!selectedImageId) {
-        alert(
-          "Please select an image first."
-        );
+      if (selectedFiles.length === 0) {
         return;
       }
 
-      try {
-        const response =
-          await fetch(
-            `${API_URL}/api/images/${selectedImageId}`,
-            {
-              method: "GET",
-              headers:
-                getImageHeaders(),
-            }
-          );
+      if (!patient?.id || !study?.id) {
+        alert("Patient and study information are required.");
 
-        if (!response.ok) {
-          throw new Error(
-            "Unable to download image."
-          );
-        }
-
-        const blob =
-          await response.blob();
-
-        const url =
-          URL.createObjectURL(
-            blob
-          );
-
-        const link =
-          document.createElement(
-            "a"
-          );
-
-        link.href = url;
-
-        link.download =
-          selectedImage?.fileName ||
-          `medical-image-${
-            selectedImageId
-          }`;
-
-        document.body.appendChild(
-          link
-        );
-
-        link.click();
-        link.remove();
-
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 1000);
-      } catch (error) {
-        console.error(
-          "Download error:",
-          error
-        );
-
-        alert(
-          error?.message ||
-            "Unable to download image."
-        );
-      }
-    }, [
-      selectedImageId,
-      selectedImage?.fileName,
-    ]);
-
-  const handleDelete =
-    useCallback(async () => {
-      if (!selectedImageId) {
-        alert(
-          "Please select an image first."
-        );
-
+        event.target.value = "";
         return;
       }
 
-      const confirmed =
-        window.confirm(
-          `Delete ${
-            selectedImage?.fileName ||
-            "this image"
-          }?`
-        );
-
-      if (!confirmed) {
-        return;
-      }
-
-      const userId =
-        getUserId();
+      const userId = getCurrentUserId();
 
       if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
+        alert("Your login session was not found. Please login again.");
 
         navigate("/");
         return;
       }
 
       try {
-        setDeleting(true);
+        setUploading(true);
 
-        const response =
-          await fetch(
-            `${API_URL}/api/images/${selectedImageId}`,
-            {
-              method: "DELETE",
-              headers: {
-                ...authHeaders(),
-              },
-            }
-          );
+        const formData = new FormData();
+
+        selectedFiles.forEach((file) => {
+          formData.append("images", file);
+        });
+
+        formData.append("patientId", String(patient.id));
+
+        formData.append("studyId", String(study.id));
+
+        formData.append("seriesNumber", String(series?.seriesNumber || 1));
+
+        formData.append(
+          "seriesDescription",
+          series?.seriesDescription || `${modality} Image Series`
+        );
+
+        formData.append("modality", study?.modality || "OT");
+
+        const response = await fetch(`${API_URL}/api/series/upload`, {
+          method: "POST",
+          headers: {
+            ...authHeaders(),
+          },
+          body: formData,
+        });
 
         let data = {};
 
         try {
-          data =
-            await response.json();
+          data = await response.json();
         } catch (error) {
           data = {};
         }
 
         if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "Unable to delete image."
-          );
+          throw new Error(data?.message || "Unable to upload images.");
         }
-
-        if (
-          thumbnailCacheRef
-            .current[
-            selectedImageId
-          ]
-        ) {
-          URL.revokeObjectURL(
-            thumbnailCacheRef
-              .current[
-              selectedImageId
-            ]
-          );
-
-          delete thumbnailCacheRef
-            .current[
-            selectedImageId
-          ];
-        }
-
-        setSelectedImageId(null);
-
 
         await loadStudyImages();
-      } catch (error) {
-        console.error(
-          "Delete error:",
-          error
-        );
 
         alert(
-          error?.message ||
-            "Unable to delete image."
+          `${selectedFiles.length} image${
+            selectedFiles.length === 1 ? "" : "s"
+          } uploaded successfully.`
         );
+      } catch (error) {
+        console.error("Upload error:", error);
+
+        alert(error?.message || "Unable to upload images.");
       } finally {
-        setDeleting(false);
+        setUploading(false);
+        event.target.value = "";
       }
-    }, [
-      selectedImageId,
-      selectedImage?.fileName,
-      navigate,
-      loadStudyImages,
-    ]);
-
-  const handleAIAnalysis =
-    useCallback(async () => {
-      if (
-        !patient?.id ||
-        !study?.id
-      ) {
-        alert(
-          "Patient and study information are required."
-        );
-
-        return;
-      }
-
-      if (images.length === 0) {
-        alert(
-          "No images are available for AI analysis."
-        );
-
-        return;
-      }
-
-      const userId =
-        getUserId();
-
-      if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
-
-        navigate("/");
-        return;
-      }
-
-      try {
-        setAnalysisStatus(
-          "processing"
-        );
-
-        setAiResult(null);
-        setAiFindings([]);
-
-        const response =
-          await fetch(
-            `${API_URL}/api/ai/analyze-study`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
-                ...authHeaders(),
-              },
-              body: JSON.stringify({
-                patientId:
-                  patient.id,
-                studyId:
-                  study.id,
-                seriesId:
-                  series?.id ||
-                  null,
-              }),
-            }
-          );
-
-        let data = {};
-
-        try {
-          data =
-            await response.json();
-        } catch (error) {
-          data = {};
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "AI analysis failed."
-          );
-        }
-
-        const result =
-          data?.result ||
-          data;
-
-        setAiResult(result);
-
-        setAiFindings(
-          Array.isArray(
-            result?.findings
-          )
-            ? result.findings
-            : []
-        );
-
-        setAnalysisStatus(
-          "completed"
-        );
-      } catch (error) {
-        console.error(
-          "AI analysis error:",
-          error
-        );
-
-        setAnalysisStatus(
-          "error"
-        );
-
-        setAiResult(null);
-        setAiFindings([]);
-
-        alert(
-          error?.message ||
-            "AI analysis failed. Check the AI service."
-        );
-      }
-    }, [
+    },
+    [
       patient?.id,
       study?.id,
-      series?.id,
-      images.length,
+      series?.seriesNumber,
+      series?.seriesDescription,
+      study?.modality,
+      modality,
       navigate,
-    ]);
+      loadStudyImages,
+    ]
+  );
+
+  const handleDownload = useCallback(async () => {
+    if (!selectedImageId) {
+      alert("Please select an image first.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/images/${selectedImageId}`, {
+        method: "GET",
+        headers: authHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to download image.");
+      }
+
+      const blob = await response.blob();
+
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+
+      link.href = url;
+
+      link.download = selectedImage?.fileName || `medical-image-${selectedImageId}`;
+
+      document.body.appendChild(link);
+
+      link.click();
+      link.remove();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (error) {
+      console.error("Download error:", error);
+
+      alert(error?.message || "Unable to download image.");
+    }
+  }, [selectedImageId, selectedImage?.fileName]);
+
+  const handleDelete = useCallback(async () => {
+    if (!selectedImageId) {
+      alert("Please select an image first.");
+
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${selectedImage?.fileName || "this image"}?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    const userId = getCurrentUserId();
+
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
+
+      navigate("/");
+      return;
+    }
+
+    try {
+      setDeleting(true);
+
+      const response = await fetch(`${API_URL}/api/images/${selectedImageId}`, {
+        method: "DELETE",
+        headers: {
+          ...authHeaders(),
+        },
+      });
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to delete image.");
+      }
+
+      if (thumbnailCacheRef.current[selectedImageId]) {
+        URL.revokeObjectURL(thumbnailCacheRef.current[selectedImageId]);
+
+        delete thumbnailCacheRef.current[selectedImageId];
+      }
+
+      setSelectedImageId(null);
+
+      await loadStudyImages();
+    } catch (error) {
+      console.error("Delete error:", error);
+
+      alert(error?.message || "Unable to delete image.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedImageId, selectedImage?.fileName, navigate, loadStudyImages]);
+
+  const handleAIAnalysis = useCallback(async () => {
+    if (!patient?.id || !study?.id) {
+      alert("Patient and study information are required.");
+
+      return;
+    }
+
+    if (images.length === 0) {
+      alert("No images are available for AI analysis.");
+
+      return;
+    }
+
+    const userId = getCurrentUserId();
+
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
+
+      navigate("/");
+      return;
+    }
+
+    try {
+      setAnalysisStatus("processing");
+
+      setAiResult(null);
+      setAiFindings([]);
+
+      const response = await fetch(`${API_URL}/api/ai/analyze-study`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          patientId: patient.id,
+          studyId: study.id,
+          seriesId: series?.id || null,
+        }),
+      });
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.message || "AI analysis failed.");
+      }
+
+      const result = data?.result || data;
+
+      setAiResult(result);
+
+      setAiFindings(Array.isArray(result?.findings) ? result.findings : []);
+
+      setAnalysisStatus("completed");
+    } catch (error) {
+      console.error("AI analysis error:", error);
+
+      setAnalysisStatus("error");
+
+      setAiResult(null);
+      setAiFindings([]);
+
+      alert(error?.message || "AI analysis failed. Check the AI service.");
+    }
+  }, [patient?.id, study?.id, series?.id, images.length, navigate]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      const target =
-        event.target;
+      const target = event.target;
 
-      const tag =
-        target?.tagName?.toLowerCase();
+      const tag = target?.tagName?.toLowerCase();
 
-      if (
-        tag === "input" ||
-        tag === "textarea" ||
-        tag === "select" ||
-        target?.isContentEditable
-      ) {
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
         return;
       }
 
-      const key =
-        normalizeHotkey(
-          event.key
-        );
+      const key = normalizeHotkey(event.key);
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.zoomIn
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.zoomIn)) {
         event.preventDefault();
         zoomIn();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.zoomOut
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.zoomOut)) {
         event.preventDefault();
         zoomOut();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.reset
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.reset)) {
         event.preventDefault();
         resetViewer();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.rotateRight
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.rotateRight)) {
         event.preventDefault();
         rotateRight();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.rotateLeft
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.rotateLeft)) {
         event.preventDefault();
         rotateLeft();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.firstImage
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.firstImage)) {
         event.preventDefault();
         firstImage();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.lastImage
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.lastImage)) {
         event.preventDefault();
         lastImage();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.nextImage
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.nextImage)) {
         event.preventDefault();
         nextImage();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.previousImage
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.previousImage)) {
         event.preventDefault();
         previousImage();
         return;
       }
 
-      if (
-        key ===
-        normalizeHotkey(
-          hotkeys.cancel
-        )
-      ) {
+      if (key === normalizeHotkey(hotkeys.cancel)) {
       }
     };
 
-    window.addEventListener(
-      "keydown",
-      onKeyDown
-    );
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        onKeyDown
-      );
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, [
     hotkeys,
@@ -1214,7 +711,7 @@ function ImageViewer() {
     nextImage,
     previousImage,
   ]);
-    return (
+  return (
     <Layout>
       <Box
         ref={viewerRef}
@@ -1475,9 +972,7 @@ function ImageViewer() {
               <IconButton
                 size="small"
                 disabled={uploading}
-                onClick={() =>
-                  fileInputRef.current?.click()
-                }
+                onClick={() => fileInputRef.current?.click()}
                 sx={{
                   color: "#d7e2ee",
                   backgroundColor: "#1b2632",
@@ -1486,11 +981,7 @@ function ImageViewer() {
                   },
                 }}
               >
-                {uploading ? (
-                  <CircularProgress size={17} />
-                ) : (
-                  <UploadFileIcon fontSize="small" />
-                )}
+                {uploading ? <CircularProgress size={17} /> : <UploadFileIcon fontSize="small" />}
               </IconButton>
             </span>
           </Tooltip>
@@ -1522,10 +1013,7 @@ function ImageViewer() {
             <span>
               <IconButton
                 size="small"
-                disabled={
-                  deleting ||
-                  !selectedImageId
-                }
+                disabled={deleting || !selectedImageId}
                 onClick={handleDelete}
                 sx={{
                   color: "#ef9a9a",
@@ -1535,11 +1023,7 @@ function ImageViewer() {
                   },
                 }}
               >
-                {deleting ? (
-                  <CircularProgress size={17} />
-                ) : (
-                  <DeleteIcon fontSize="small" />
-                )}
+                {deleting ? <CircularProgress size={17} /> : <DeleteIcon fontSize="small" />}
               </IconButton>
             </span>
           </Tooltip>
@@ -1576,16 +1060,11 @@ function ImageViewer() {
                   }}
                 />
               ) : (
-                <SmartToyIcon
-                  fontSize="small"
-                />
+                <SmartToyIcon fontSize="small" />
               )
             }
             onClick={handleAIAnalysis}
-            disabled={
-              analysisStatus === "processing" ||
-              images.length === 0
-            }
+            disabled={analysisStatus === "processing" || images.length === 0}
             sx={{
               height: 31,
               textTransform: "none",
@@ -1597,9 +1076,7 @@ function ImageViewer() {
               },
             }}
           >
-            {analysisStatus === "processing"
-              ? "Analyzing..."
-              : "AI Analyze"}
+            {analysisStatus === "processing" ? "Analyzing..." : "AI Analyze"}
           </Button>
         </Box>
 
@@ -1610,8 +1087,7 @@ function ImageViewer() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns:
-              "155px minmax(0, 1fr) 360px",
+            gridTemplateColumns: "155px minmax(0, 1fr) 360px",
             height: "calc(100vh - 88px)",
             minHeight: 0,
             overflow: "hidden",
@@ -1625,8 +1101,7 @@ function ImageViewer() {
             sx={{
               minHeight: 0,
               overflow: "hidden",
-              borderRight:
-                "1px solid #252a34",
+              borderRight: "1px solid #252a34",
               backgroundColor: "#0d131a",
               display: "flex",
               flexDirection: "column",
@@ -1641,10 +1116,8 @@ function ImageViewer() {
                 px: 1,
                 display: "flex",
                 alignItems: "center",
-                justifyContent:
-                  "space-between",
-                borderBottom:
-                  "1px solid #273241",
+                justifyContent: "space-between",
+                borderBottom: "1px solid #273241",
               }}
             >
               <Box
@@ -1688,8 +1161,7 @@ function ImageViewer() {
               sx={{
                 px: 1,
                 py: 0.8,
-                borderBottom:
-                  "1px solid #202b38",
+                borderBottom: "1px solid #202b38",
               }}
             >
               <Typography
@@ -1701,8 +1173,7 @@ function ImageViewer() {
                   textOverflow: "ellipsis",
                 }}
               >
-                {series?.seriesDescription ||
-                  `${modality} Image Series`}
+                {series?.seriesDescription || `${modality} Image Series`}
               </Typography>
 
               <Typography
@@ -1712,8 +1183,7 @@ function ImageViewer() {
                   mt: 0.25,
                 }}
               >
-                Series{" "}
-                {series?.seriesNumber || 1}
+                Series {series?.seriesNumber || 1}
               </Typography>
             </Box>
 
@@ -1763,115 +1233,87 @@ function ImageViewer() {
                 </Box>
               ) : (
                 <Stack spacing={0.55}>
-                  {images.map(
-                    (item, index) => {
-                      const selected =
-                        Number(item.id) ===
-                        Number(selectedImageId);
+                  {images.map((item, index) => {
+                    const selected = Number(item.id) === Number(selectedImageId);
 
-                      return (
-                        <Box
-                          key={item.id}
-                          onClick={() =>
-                            setSelectedImageId(
-                              item.id
-                            )
-                          }
-                          sx={{
-                            position: "relative",
-                            width: "100%",
-                            height: 78,
-                            flexShrink: 0,
-                            backgroundColor:
-                              "#05080c",
-                            border: selected
-                              ? "2px solid #42a5f5"
-                              : "1px solid #293646",
-                            borderRadius: 1,
-                            overflow: "hidden",
-                            cursor: "pointer",
-                            transition:
-                              "border-color .15s ease",
-                            "&:hover": {
-                              borderColor:
-                                "#607d9a",
-                            },
-                          }}
-                        >
-                          {thumbnailUrls[
-                            item.id
-                          ] ? (
-                            <img
-                              src={
-                                thumbnailUrls[
-                                  item.id
-                                ]
-                              }
-                              alt={`Scan ${
-                                index + 1
-                              }`}
-                              draggable={false}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                display: "block",
-                                objectFit: "contain",
-                                background:
-                                  "#000000",
-                              }}
-                            />
-                          ) : (
-                            <Box
-                              sx={{
-                                width: "100%",
-                                height: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent:
-                                  "center",
-                              }}
-                            >
-                              <CircularProgress
-                                size={15}
-                                thickness={3}
-                              />
-                            </Box>
-                          )}
-
-                          {/* IMAGE NUMBER */}
-
+                    return (
+                      <Box
+                        key={item.id}
+                        onClick={() => setSelectedImageId(item.id)}
+                        sx={{
+                          position: "relative",
+                          width: "100%",
+                          height: 78,
+                          flexShrink: 0,
+                          backgroundColor: "#05080c",
+                          border: selected ? "2px solid #42a5f5" : "1px solid #293646",
+                          borderRadius: 1,
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          transition: "border-color .15s ease",
+                          "&:hover": {
+                            borderColor: "#607d9a",
+                          },
+                        }}
+                      >
+                        {thumbnailUrls[item.id] ? (
+                          <img
+                            src={thumbnailUrls[item.id]}
+                            alt={`Scan ${index + 1}`}
+                            draggable={false}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "block",
+                              objectFit: "contain",
+                              background: "#000000",
+                            }}
+                          />
+                        ) : (
                           <Box
                             sx={{
-                              position: "absolute",
-                              left: 3,
-                              bottom: 3,
-                              minWidth: 17,
-                              height: 17,
-                              px: 0.3,
-                              borderRadius: 0.5,
-                              backgroundColor:
-                                "rgba(0,0,0,.78)",
+                              width: "100%",
+                              height: "100%",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent:
-                                "center",
+                              justifyContent: "center",
                             }}
                           >
-                            <Typography
-                              sx={{
-                                fontSize: 9,
-                                lineHeight: 1,
-                                color: "#ffffff",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {index + 1}
-                            </Typography>
+                            <CircularProgress size={15} thickness={3} />
                           </Box>
+                        )}
+
+                        {/* IMAGE NUMBER */}
+
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            left: 3,
+                            bottom: 3,
+                            minWidth: 17,
+                            height: 17,
+                            px: 0.3,
+                            borderRadius: 0.5,
+                            backgroundColor: "rgba(0,0,0,.78)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: 9,
+                              lineHeight: 1,
+                              color: "#ffffff",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {index + 1}
+                          </Typography>
                         </Box>
-                      );
-                    }
-                  )}
+                      </Box>
+                    );
+                  })}
                 </Stack>
               )}
             </Box>
@@ -1923,8 +1365,7 @@ function ImageViewer() {
             height: 30,
             flexShrink: 0,
             backgroundColor: "#0b1118",
-            borderTop:
-              "1px solid #273241",
+            borderTop: "1px solid #273241",
             display: "flex",
             alignItems: "center",
             px: 1.5,

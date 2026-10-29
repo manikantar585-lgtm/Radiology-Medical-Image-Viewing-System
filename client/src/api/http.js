@@ -30,6 +30,10 @@ export function getStoredUser() {
   }
 }
 
+export function getCurrentUserId() {
+  return getStoredUser()?.id ?? null;
+}
+
 export function isAuthenticated() {
   return Boolean(getToken() && getStoredUser());
 }

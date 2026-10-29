@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
-import { API_URL, jsonHeaders } from "../api/http";
+import { API_URL, jsonHeaders, getCurrentUserId } from "../api/http";
 
 import {
   Box,
@@ -45,83 +45,41 @@ function Patients() {
     phone: "",
   });
   const [loading, setLoading] = useState(false);
-  const getLoggedInUser = React.useCallback(() => {
-    try {
-      const storedUser =
-        localStorage.getItem("loggedInUser");
-      if (!storedUser) {
-        return null;
-      }
-      return JSON.parse(storedUser);
-    } catch (error) {
-      console.error(
-        "Logged-in User Error:",
-        error
-      );
-      return null;
-    }
-  }, []);
-  const getUserId = React.useCallback(() => {
-    const user = getLoggedInUser();
-    if (!user || !user.id) {
-      return null;
-    }
-    return user.id;
-  }, [getLoggedInUser]);
-  const getUserHeaders = jsonHeaders;
   const fetchPatients = React.useCallback(async () => {
     try {
       setLoading(true);
-      const userId = getUserId();
+      const userId = getCurrentUserId();
       if (!userId) {
-        alert(
-          "User session not found. Please login again."
-        );
+        alert("User session not found. Please login again.");
         navigate("/");
         return;
       }
-      const response = await fetch(
-        `${API_URL}/api/patients`,
-        {
-          method: "GET",
-          headers: getUserHeaders(),
-        }
-      );
-      const data =
-        await response.json();
+      const response = await fetch(`${API_URL}/api/patients`, {
+        method: "GET",
+        headers: jsonHeaders(),
+      });
+      const data = await response.json();
       if (!response.ok) {
-        alert(
-          data.message ||
-            "Unable to load patients"
-        );
+        alert(data.message || "Unable to load patients");
         return;
       }
-      setPatients(
-        data.patients || []
-      );
+      setPatients(data.patients || []);
     } catch (error) {
-      console.error(
-        "Fetch Patients Error:",
-        error
-      );
-      alert(
-        "Cannot connect to backend server."
-      );
+      console.error("Fetch Patients Error:", error);
+      alert("Cannot connect to backend server.");
     } finally {
       setLoading(false);
     }
-  }, [getUserHeaders, getUserId, navigate]);
+  }, [navigate]);
   useEffect(() => {
-    const userId = getUserId();
+    const userId = getCurrentUserId();
     if (!userId) {
-      alert(
-        "Your login session was not found. Please login again."
-      );
+      alert("Your login session was not found. Please login again.");
       navigate("/");
       return;
     }
     fetchPatients();
-  }, [fetchPatients, getUserId, navigate]);
+  }, [fetchPatients, navigate]);
   const handleOpen = () => {
     setEditingPatient(null);
     setNewPatient({
@@ -147,93 +105,52 @@ function Patients() {
   const handleChange = (event) => {
     setNewPatient({
       ...newPatient,
-      [event.target.name]:
-        event.target.value,
+      [event.target.name]: event.target.value,
     });
   };
   const handleSave = async () => {
-    if (
-      !newPatient.name ||
-      !newPatient.age ||
-      !newPatient.gender ||
-      !newPatient.phone
-    ) {
-      alert(
-        "Please fill all required fields."
-      );
+    if (!newPatient.name || !newPatient.age || !newPatient.gender || !newPatient.phone) {
+      alert("Please fill all required fields.");
       return;
     }
     try {
       setLoading(true);
-      const userId = getUserId();
+      const userId = getCurrentUserId();
       if (!userId) {
-        alert(
-          "User session not found. Please login again."
-        );
+        alert("User session not found. Please login again.");
         navigate("/");
         return;
       }
       if (editingPatient) {
-        const response =
-          await fetch(
-            `${API_URL}/api/patients/${editingPatient.id}`,
-            {
-              method: "PUT",
-              headers:
-                getUserHeaders(),
-              body: JSON.stringify(
-                newPatient
-              ),
-            }
-          );
-        const data =
-          await response.json();
+        const response = await fetch(`${API_URL}/api/patients/${editingPatient.id}`, {
+          method: "PUT",
+          headers: jsonHeaders(),
+          body: JSON.stringify(newPatient),
+        });
+        const data = await response.json();
         if (!response.ok) {
-          alert(
-            data.message ||
-              "Unable to update patient"
-          );
+          alert(data.message || "Unable to update patient");
           return;
         }
-        alert(
-          "Patient updated successfully"
-        );
+        alert("Patient updated successfully");
       } else {
-        const response =
-          await fetch(
-            `${API_URL}/api/patients`,
-            {
-              method: "POST",
-              headers:
-                getUserHeaders(),
-              body: JSON.stringify(
-                newPatient
-              ),
-            }
-          );
-        const data =
-          await response.json();
+        const response = await fetch(`${API_URL}/api/patients`, {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify(newPatient),
+        });
+        const data = await response.json();
         if (!response.ok) {
-          alert(
-            data.message ||
-              "Unable to add patient"
-          );
+          alert(data.message || "Unable to add patient");
           return;
         }
-        alert(
-          "Patient added successfully"
-        );
+        alert("Patient added successfully");
       }
       handleClose();
       await fetchPatients();
     } catch (error) {
-      console.error(
-        "Save Patient Error:",
-        error
-      );
-      alert(
-        "Cannot connect to backend server."
-      );
+      console.error("Save Patient Error:", error);
+      alert("Cannot connect to backend server.");
     } finally {
       setLoading(false);
     }
@@ -251,53 +168,32 @@ function Patients() {
     setOpen(true);
   };
   const handleDelete = async (id) => {
-    const confirmDelete =
-      window.confirm(
-        "Are you sure you want to delete this patient?"
-      );
+    const confirmDelete = window.confirm("Are you sure you want to delete this patient?");
     if (!confirmDelete) {
       return;
     }
     try {
       setLoading(true);
-      const userId = getUserId();
+      const userId = getCurrentUserId();
       if (!userId) {
-        alert(
-          "User session not found. Please login again."
-        );
+        alert("User session not found. Please login again.");
         navigate("/");
         return;
       }
-      const response =
-        await fetch(
-          `${API_URL}/api/patients/${id}`,
-          {
-            method: "DELETE",
-            headers:
-              getUserHeaders(),
-          }
-        );
-      const data =
-        await response.json();
+      const response = await fetch(`${API_URL}/api/patients/${id}`, {
+        method: "DELETE",
+        headers: jsonHeaders(),
+      });
+      const data = await response.json();
       if (!response.ok) {
-        alert(
-          data.message ||
-            "Unable to delete patient"
-        );
+        alert(data.message || "Unable to delete patient");
         return;
       }
-      alert(
-        "Patient deleted successfully"
-      );
+      alert("Patient deleted successfully");
       await fetchPatients();
     } catch (error) {
-      console.error(
-        "Delete Patient Error:",
-        error
-      );
-      alert(
-        "Cannot connect to backend server."
-      );
+      console.error("Delete Patient Error:", error);
+      alert("Cannot connect to backend server.");
     } finally {
       setLoading(false);
     }
@@ -306,65 +202,30 @@ function Patients() {
     setSearch("");
     setGender("");
   };
-  const filteredPatients =
-    patients.filter((patient) => {
-      const patientName =
-        patient.name?.toLowerCase() ||
-        "";
-      const patientPhone =
-        String(
-          patient.phone || ""
-        ).toLowerCase();
-      const searchText =
-        search.toLowerCase();
-      const matchesSearch =
-        patientName.includes(
-          searchText
-        ) ||
-        patientPhone.includes(
-          searchText
-        ) ||
-        String(
-          patient.id
-        ).includes(searchText);
-      const matchesGender =
-        gender === "" ||
-        patient.gender === gender;
-      return (
-        matchesSearch &&
-        matchesGender
-      );
-    });
+  const filteredPatients = patients.filter((patient) => {
+    const patientName = patient.name?.toLowerCase() || "";
+    const patientPhone = String(patient.phone || "").toLowerCase();
+    const searchText = search.toLowerCase();
+    const matchesSearch =
+      patientName.includes(searchText) ||
+      patientPhone.includes(searchText) ||
+      String(patient.id).includes(searchText);
+    const matchesGender = gender === "" || patient.gender === gender;
+    return matchesSearch && matchesGender;
+  });
   return (
     <Layout>
       <Box sx={{ width: "100%" }}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={3}
-        >
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-            >
+            <Typography variant="h4" fontWeight="bold">
               Patient Management
             </Typography>
-            <Typography
-              color="text.secondary"
-              mt={1}
-            >
-              Manage patient records and
-              information
+            <Typography color="text.secondary" mt={1}>
+              Manage patient records and information
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<AddIcon />}
-            onClick={handleOpen}
-          >
+          <Button variant="contained" size="large" startIcon={<AddIcon />} onClick={handleOpen}>
             Add Patient
           </Button>
         </Box>
@@ -378,53 +239,31 @@ function Patients() {
             boxSizing: "border-box",
           }}
         >
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-            <Grid
-              item
-              xs={12}
-              md={6}
-            >
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 size="small"
                 label="Search Patient"
                 value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value
-                  )
-                }
+                onChange={(event) => setSearch(event.target.value)}
                 InputProps={{
                   startAdornment: (
-                    <InputAdornment
-                      position="start"
-                    >
+                    <InputAdornment position="start">
                       <SearchIcon />
                     </InputAdornment>
                   ),
                 }}
               />
             </Grid>
-            <Grid
-              item
-              xs={12}
-              md={3}
-            >
+            <Grid item xs={12} md={3}>
               <TextField
                 select
                 fullWidth
                 size="small"
                 label="Gender"
                 value={gender}
-                onChange={(event) =>
-                  setGender(
-                    event.target.value
-                  )
-                }
+                onChange={(event) => setGender(event.target.value)}
                 sx={{
                   minWidth: {
                     xs: "100%",
@@ -432,25 +271,13 @@ function Patients() {
                   },
                 }}
               >
-                <MenuItem value="">
-                  All Genders
-                </MenuItem>
-                <MenuItem value="Male">
-                  Male
-                </MenuItem>
-                <MenuItem value="Female">
-                  Female
-                </MenuItem>
-                <MenuItem value="Other">
-                  Other
-                </MenuItem>
+                <MenuItem value="">All Genders</MenuItem>
+                <MenuItem value="Male">Male</MenuItem>
+                <MenuItem value="Female">Female</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
               </TextField>
             </Grid>
-            <Grid
-              item
-              xs={12}
-              md={3}
-            >
+            <Grid item xs={12} md={3}>
               <Button
                 fullWidth
                 variant="outlined"
@@ -501,125 +328,72 @@ function Patients() {
                     <strong>Phone</strong>
                   </TableCell>
                   <TableCell align="center">
-                    <strong>
-                      Action
-                    </strong>
+                    <strong>Action</strong>
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      align="center"
-                      sx={{ py: 4 }}
-                    >
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       Loading patients...
                     </TableCell>
                   </TableRow>
-                ) : filteredPatients.length ===
-                  0 ? (
+                ) : filteredPatients.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      align="center"
-                      sx={{ py: 4 }}
-                    >
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       No patients found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPatients.map(
-                    (patient) => (
-                      <TableRow
-                        key={patient.id}
-                        hover
-                      >
-                        <TableCell>
-                          {patient.id}
-                        </TableCell>
-                        <TableCell>
-                          {patient.name}
-                        </TableCell>
-                        <TableCell>
-                          {patient.age}
-                        </TableCell>
-                        <TableCell>
-                          {patient.gender}
-                        </TableCell>
-                        <TableCell>
-                          {patient.phone}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Box
-                            display="flex"
-                            justifyContent="center"
-                            alignItems="center"
-                            gap={1}
+                  filteredPatients.map((patient) => (
+                    <TableRow key={patient.id} hover>
+                      <TableCell>{patient.id}</TableCell>
+                      <TableCell>{patient.name}</TableCell>
+                      <TableCell>{patient.age}</TableCell>
+                      <TableCell>{patient.gender}</TableCell>
+                      <TableCell>{patient.phone}</TableCell>
+                      <TableCell align="center">
+                        <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<VisibilityIcon />}
+                            onClick={() =>
+                              navigate("/studies", {
+                                state: {
+                                  patient,
+                                },
+                              })
+                            }
                           >
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={
-                                <VisibilityIcon />
-                              }
-                              onClick={() =>
-                                navigate(
-                                  "/studies",
-                                  {
-                                    state: {
-                                      patient,
-                                    },
-                                  }
-                                )
-                              }
-                            >
-                              Studies
-                            </Button>
-                            <IconButton
-                              color="warning"
-                              title="Edit"
-                              onClick={() =>
-                                handleEdit(
-                                  patient
-                                )
-                              }
-                            >
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              color="error"
-                              title="Delete"
-                              onClick={() =>
-                                handleDelete(
-                                  patient.id
-                                )
-                              }
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  )
+                            Studies
+                          </Button>
+                          <IconButton
+                            color="warning"
+                            title="Edit"
+                            onClick={() => handleEdit(patient)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            title="Delete"
+                            onClick={() => handleDelete(patient.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </TableContainer>
         </Paper>
-        <Dialog
-          open={open}
-          onClose={handleClose}
-          fullWidth
-          maxWidth="sm"
-        >
-          <DialogTitle>
-            {editingPatient
-              ? "Edit Patient"
-              : "Add New Patient"}
-          </DialogTitle>
+        <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+          <DialogTitle>{editingPatient ? "Edit Patient" : "Add New Patient"}</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
@@ -647,15 +421,9 @@ function Patients() {
               value={newPatient.gender}
               onChange={handleChange}
             >
-              <MenuItem value="Male">
-                Male
-              </MenuItem>
-              <MenuItem value="Female">
-                Female
-              </MenuItem>
-              <MenuItem value="Other">
-                Other
-              </MenuItem>
+              <MenuItem value="Male">Male</MenuItem>
+              <MenuItem value="Female">Female</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
             </TextField>
             <TextField
               fullWidth
@@ -666,22 +434,10 @@ function Patients() {
               onChange={handleChange}
             />
           </DialogContent>
-          <DialogActions
-            sx={{ p: 2 }}
-          >
-            <Button
-              onClick={handleClose}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              {editingPatient
-                ? "Update Patient"
-                : "Save Patient"}
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={handleClose}>Cancel</Button>
+            <Button variant="contained" onClick={handleSave} disabled={loading}>
+              {editingPatient ? "Update Patient" : "Save Patient"}
             </Button>
           </DialogActions>
         </Dialog>

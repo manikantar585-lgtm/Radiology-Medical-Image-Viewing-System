@@ -16,28 +16,18 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-import {
-  Link,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession } from "../api/http";
 
 const drawerWidth = 250;
 function Sidebar() {
-  const location =
-    useLocation();
-  const navigate =
-    useNavigate();
+  const location = useLocation();
+  const navigate = useNavigate();
   const handleLogout = () => {
-    const confirmLogout =
-      window.confirm(
-        "Are you sure you want to logout?"
-      );
+    const confirmLogout = window.confirm("Are you sure you want to logout?");
     if (confirmLogout) {
       clearSession();
       navigate("/");
-
     }
   };
   const menuItems = [
@@ -76,133 +66,80 @@ function Sidebar() {
     <Drawer
       variant="permanent"
       sx={{
-        width:
-          drawerWidth,
-        flexShrink:
-          0,
+        width: drawerWidth,
+        flexShrink: 0,
         "& .MuiDrawer-paper": {
-          width:
-            drawerWidth,
-          boxSizing:
-            "border-box",
-          backgroundColor:
-            "background.paper",
-          color:
-            "text.primary",
-          borderRight:
-            "1px solid",
-          borderColor:
-            "divider",
-          transition:
-            "background-color 0.3s ease, color 0.3s ease",
+          width: drawerWidth,
+          boxSizing: "border-box",
+          backgroundColor: "background.paper",
+          color: "text.primary",
+          borderRight: "1px solid",
+          borderColor: "divider",
+          transition: "background-color 0.3s ease, color 0.3s ease",
         },
       }}
     >
       <Toolbar />
       <List>
-        {menuItems.map(
-          (item) => (
-            <ListItemButton
-              key={
-                item.text
-              }
-              component={
-                Link
-              }
-              to={
-                item.path
-              }
-              selected={
-                location.pathname ===
-                item.path
-              }
-              sx={{
-                mx:
-                  1,
-                my:
-                  0.5,
-                borderRadius:
-                  2,
-                color:
-                  "text.primary",
-                "& .MuiListItemIcon-root":
-                  {
-                    color:
-                      "text.secondary",
-                  },
-                "&.Mui-selected":
-                  {
-                    backgroundColor:
-                      "primary.main",
-                    color:
-                      "primary.contrastText",
+        {menuItems.map((item) => (
+          <ListItemButton
+            key={item.text}
+            component={Link}
+            to={item.path}
+            selected={location.pathname === item.path}
+            sx={{
+              mx: 1,
+              my: 0.5,
+              borderRadius: 2,
+              color: "text.primary",
+              "& .MuiListItemIcon-root": {
+                color: "text.secondary",
+              },
+              "&.Mui-selected": {
+                backgroundColor: "primary.main",
+                color: "primary.contrastText",
 
-                    "& .MuiListItemIcon-root":
-                      {
-                        color:
-                          "primary.contrastText",
-                      },
-                  },
-                "&.Mui-selected:hover":
-                  {
-                    backgroundColor:
-                      "primary.dark",
-                  },
-                "&:hover":
-                  {
-                    backgroundColor:
-                      "action.hover",
-                  },
-              }}
-            >
-              <ListItemIcon>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  item.text
-                }
-              />
-            </ListItemButton>
-          )
-        )}
+                "& .MuiListItemIcon-root": {
+                  color: "primary.contrastText",
+                },
+              },
+              "&.Mui-selected:hover": {
+                backgroundColor: "primary.dark",
+              },
+              "&:hover": {
+                backgroundColor: "action.hover",
+              },
+            }}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItemButton>
+        ))}
       </List>
       <Divider
         sx={{
-          mt:
-            2,
+          mt: 2,
         }}
       />
       <List>
         <ListItemButton
-          onClick={
-            handleLogout
-          }
+          onClick={handleLogout}
           sx={{
-            mx:
-              1,
-            borderRadius:
-              2,
-            color:
-              "error.main",
-            "& .MuiListItemIcon-root":
-              {
-                color:
-                  "error.main",
-              },
-            "&:hover":
-              {
-                backgroundColor:
-                  "action.hover",
-              },
+            mx: 1,
+            borderRadius: 2,
+            color: "error.main",
+            "& .MuiListItemIcon-root": {
+              color: "error.main",
+            },
+            "&:hover": {
+              backgroundColor: "action.hover",
+            },
           }}
         >
           <ListItemIcon>
             <LogoutIcon />
           </ListItemIcon>
-          <ListItemText
-            primary="Logout"
-          />
+          <ListItemText primary="Logout" />
         </ListItemButton>
       </List>
     </Drawer>

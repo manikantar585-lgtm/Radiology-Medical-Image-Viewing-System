@@ -1,20 +1,8 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import {
-  createTheme,
-  ThemeProvider,
-  CssBaseline,
-} from "@mui/material";
+import { createTheme, ThemeProvider, CssBaseline } from "@mui/material";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -78,121 +66,61 @@ const themeConfigs = {
   },
 };
 const getSavedTheme = () => {
-  const savedTheme =
-    localStorage.getItem(
-      "radiologyTheme"
-    );
-  if (
-    savedTheme &&
-    themeConfigs[savedTheme]
-  ) {
+  const savedTheme = localStorage.getItem("radiologyTheme");
+  if (savedTheme && themeConfigs[savedTheme]) {
     return savedTheme;
   }
   return "ohif-blue";
 };
-function ProtectedRoute({
-  children,
-}) {
+function ProtectedRoute({ children }) {
   if (!isAuthenticated()) {
-   return (
-      <Navigate
-        to="/"
-        replace
-      />
-    );
+    return <Navigate to="/" replace />;
   }
   return children;
 }
 function App() {
-  const [
-    currentTheme,
-    setCurrentTheme,
-  ] = useState(
-    getSavedTheme()
-  );
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme());
   useEffect(() => {
-    const handleThemeChange =
-      () => {
-        setCurrentTheme(
-          getSavedTheme()
-        );
-      };
-    window.addEventListener(
-      "radiology-theme-change",
-      handleThemeChange
-    );
+    const handleThemeChange = () => {
+      setCurrentTheme(getSavedTheme());
+    };
+    window.addEventListener("radiology-theme-change", handleThemeChange);
     return () => {
-      window.removeEventListener(
-        "radiology-theme-change",
-        handleThemeChange
-      );
+      window.removeEventListener("radiology-theme-change", handleThemeChange);
     };
   }, []);
-  const selectedColors =
-    themeConfigs[
-      currentTheme
-    ] ||
-    themeConfigs[
-      "ohif-blue"
-    ];
-  const muiTheme =
-    createTheme({
-      palette: {
-        mode:
-          currentTheme ===
-            "midnight" ||
-          currentTheme ===
-            "deep"
-            ? "dark"
-            : "light",
-        primary: {
-          main:
-            selectedColors.primary,
-        },
-        secondary: {
-          main:
-            selectedColors.secondary,
-        },
-        background: {
-          default:
-            selectedColors.background,
-          paper:
-            selectedColors.paper,
-        },
-        text: {
-          primary:
-            selectedColors.text,
-        },
+  const selectedColors = themeConfigs[currentTheme] || themeConfigs["ohif-blue"];
+  const muiTheme = createTheme({
+    palette: {
+      mode: currentTheme === "midnight" || currentTheme === "deep" ? "dark" : "light",
+      primary: {
+        main: selectedColors.primary,
       },
-      typography: {
-        fontFamily:
-          '"Roboto", "Helvetica", "Arial", sans-serif',
+      secondary: {
+        main: selectedColors.secondary,
       },
-      shape: {
-        borderRadius: 10,
+      background: {
+        default: selectedColors.background,
+        paper: selectedColors.paper,
       },
-    });
+      text: {
+        primary: selectedColors.text,
+      },
+    },
+    typography: {
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    },
+    shape: {
+      borderRadius: 10,
+    },
+  });
   return (
-    <ThemeProvider
-      theme={
-        muiTheme
-      }
-    >
+    <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <BrowserRouter>
         <Routes>
-          <Route
-            path="/"
-            element={
-              <Login />
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <Register />
-            }
-          />
+          <Route path="/" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route
             path="/dashboard"
             element={
@@ -241,15 +169,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to="/"
-                replace
-              />
-            }
-          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

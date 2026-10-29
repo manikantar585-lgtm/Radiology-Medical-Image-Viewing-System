@@ -158,6 +158,7 @@ GitHub Actions runs all of these on every push and pull request ([`.github/workf
 ├── client/                    React web client
 │   ├── src/
 │   │   ├── api/http.js        API URL, session storage, auth headers
+│   │   ├── utils/             Shared formatting and hotkey helpers
 │   │   ├── pages/             Dashboard, Studies, Patients, ImageViewer, Reports, Settings
 │   │   └── components/        DicomViewport (Cornerstone3D), AIAnalysisPanel, Layout
 │   ├── craco.config.js        Webpack overrides for Cornerstone codecs

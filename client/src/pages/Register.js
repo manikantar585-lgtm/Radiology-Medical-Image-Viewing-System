@@ -97,9 +97,7 @@ function Register() {
       navigate("/");
     } catch (error) {
       console.error("Registration Error:", error);
-      alert(
-        "Cannot connect to backend server. Please make sure the server is running."
-      );
+      alert("Cannot connect to backend server. Please make sure the server is running.");
     } finally {
       setLoading(false);
     }
@@ -122,19 +120,10 @@ function Register() {
           borderRadius: 4,
         }}
       >
-        <Typography
-          variant="h4"
-          align="center"
-          fontWeight="bold"
-          mb={1}
-        >
+        <Typography variant="h4" align="center" fontWeight="bold" mb={1}>
           Create Account
         </Typography>
-        <Typography
-          align="center"
-          color="text.secondary"
-          mb={3}
-        >
+        <Typography align="center" color="text.secondary" mb={3}>
           Radiology Medical Image Viewing System
         </Typography>
         <TextField
@@ -229,9 +218,7 @@ function Register() {
             ),
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton
-                  onClick={() => setShowPassword(!showPassword)}
-                >
+                <IconButton onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
               </InputAdornment>
@@ -253,16 +240,8 @@ function Register() {
             ),
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton
-                  onClick={() =>
-                    setShowConfirmPassword(!showConfirmPassword)
-                  }
-                >
-                  {showConfirmPassword ? (
-                    <VisibilityOff />
-                  ) : (
-                    <Visibility />
-                  )}
+                <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                  {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
               </InputAdornment>
             ),
@@ -270,10 +249,7 @@ function Register() {
         />
         <FormControlLabel
           control={
-            <Checkbox
-              checked={agreeTerms}
-              onChange={(e) => setAgreeTerms(e.target.checked)}
-            />
+            <Checkbox checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
           }
           label="I agree to the Terms & Conditions"
           sx={{ mt: 1 }}
@@ -289,8 +265,7 @@ function Register() {
           {loading ? "Creating Account..." : "Create Account"}
         </Button>
         <Box textAlign="center" mt={3}>
-          Already have an account?{" "}
-          <Link to="/">Login</Link>
+          Already have an account? <Link to="/">Login</Link>
         </Box>
       </Paper>
     </Container>

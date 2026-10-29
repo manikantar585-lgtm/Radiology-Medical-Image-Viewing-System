@@ -1,17 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import Layout from "../components/Layout";
-import { API_URL, jsonHeaders } from "../api/http";
+import { API_URL, jsonHeaders, getStoredUser, getCurrentUserId } from "../api/http";
 
 import {
   Box,
@@ -46,265 +38,156 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ImageIcon from "@mui/icons-material/Image";
 import DescriptionIcon from "@mui/icons-material/Description";
 
-const getLoggedInUser = () => {
-  try {
-    const storedUser =
-      localStorage.getItem("loggedInUser");
-
-    if (!storedUser) {
-      return null;
-    }
-
-    return JSON.parse(storedUser);
-  } catch (error) {
-    console.error(
-      "Unable to read logged-in user:",
-      error
-    );
-
-    return null;
-  }
-};
-
-const getUserId = () => {
-  const user = getLoggedInUser();
-
-  if (!user?.id) {
-    return null;
-  }
-
-  return user.id;
-};
-
-const getUserHeaders = jsonHeaders;
-
 function Studies() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const patientFromPatientsPage =
-    location.state?.patient || null;
+  const patientFromPatientsPage = location.state?.patient || null;
 
+  const [studies, setStudies] = useState([]);
 
-  const [studies, setStudies] =
-    useState([]);
+  const [patients, setPatients] = useState([]);
 
-  const [patients, setPatients] =
-    useState([]);
+  const [reports, setReports] = useState([]);
 
-  const [reports, setReports] =
-    useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [openStudyForm, setOpenStudyForm] = useState(false);
 
-  const [openStudyForm, setOpenStudyForm] =
-    useState(false);
+  const [openReportForm, setOpenReportForm] = useState(false);
 
-  const [openReportForm, setOpenReportForm] =
-    useState(false);
+  const [editingStudy, setEditingStudy] = useState(null);
 
-  const [editingStudy, setEditingStudy] =
-    useState(null);
+  const [search, setSearch] = useState("");
 
-  const [search, setSearch] =
-    useState("");
+  const [modalityFilter, setModalityFilter] = useState("");
 
-  const [modalityFilter, setModalityFilter] =
-    useState("");
+  const [savingReport, setSavingReport] = useState(false);
 
-  const [savingReport, setSavingReport] =
-    useState(false);
+  const [reportForm, setReportForm] = useState({
+    studyId: "",
+    radiologistName: "",
+    findings: "",
+    impression: "",
+    status: "Completed",
+  });
 
-  const [reportForm, setReportForm] =
-    useState({
-      studyId: "",
-      radiologistName: "",
-      findings: "",
-      impression: "",
-      status: "Completed",
-    });
+  const [formData, setFormData] = useState({
+    patientId: "",
+    studyId: "",
+    modality: "",
+    bodyPart: "",
+    studyDate: "",
+    status: "Completed",
+  });
 
-  const [formData, setFormData] =
-    useState({
-      patientId: "",
-      studyId: "",
-      modality: "",
-      bodyPart: "",
-      studyDate: "",
-      status: "Completed",
-    });
+  const loadPatients = useCallback(async () => {
+    const userId = getCurrentUserId();
 
-  const loadPatients =
-    useCallback(async () => {
-      const userId = getUserId();
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
 
-      if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
+      navigate("/");
 
-        navigate("/");
+      return;
+    }
 
-        return;
+    try {
+      const response = await fetch(`${API_URL}/api/patients`, {
+        method: "GET",
+        headers: jsonHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load patients");
       }
 
-      try {
-        const response =
-          await fetch(
-            `${API_URL}/api/patients`,
-            {
-              method: "GET",
-              headers: getUserHeaders(),
-            }
-          );
+      setPatients(data.patients || []);
+    } catch (error) {
+      console.error("Load Patients Error:", error);
 
-        const data =
-          await response.json();
+      alert("Unable to load patients.");
+    }
+  }, [navigate]);
 
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Unable to load patients"
-          );
-        }
+  const loadStudies = useCallback(async () => {
+    const userId = getCurrentUserId();
 
-        setPatients(
-          data.patients || []
-        );
-      } catch (error) {
-        console.error(
-          "Load Patients Error:",
-          error
-        );
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
 
-        alert(
-          "Unable to load patients."
-        );
-      }
-    }, [navigate]);
+      navigate("/");
 
-  const loadStudies =
-    useCallback(async () => {
-      const userId = getUserId();
+      return;
+    }
 
-      if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
+    try {
+      setLoading(true);
 
-        navigate("/");
+      const response = await fetch(`${API_URL}/api/studies`, {
+        method: "GET",
+        headers: jsonHeaders(),
+      });
 
-        return;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load studies");
       }
 
-      try {
-        setLoading(true);
+      setStudies(data.studies || []);
+    } catch (error) {
+      console.error("Load Studies Error:", error);
 
-        const response =
-          await fetch(
-            `${API_URL}/api/studies`,
-            {
-              method: "GET",
-              headers: getUserHeaders(),
-            }
-          );
+      alert("Unable to load studies.");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
-        const data =
-          await response.json();
+  const loadReports = useCallback(async () => {
+    const userId = getCurrentUserId();
 
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Unable to load studies"
-          );
-        }
+    if (!userId) {
+      return;
+    }
 
-        setStudies(
-          data.studies || []
-        );
-      } catch (error) {
-        console.error(
-          "Load Studies Error:",
-          error
-        );
+    try {
+      const response = await fetch(`${API_URL}/api/reports`, {
+        method: "GET",
+        headers: jsonHeaders(),
+      });
 
-        alert(
-          "Unable to load studies."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, [navigate]);
+      const data = await response.json();
 
-  const loadReports =
-    useCallback(async () => {
-      const userId = getUserId();
-
-      if (!userId) {
-        return;
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load reports");
       }
 
-      try {
-        const response =
-          await fetch(
-            `${API_URL}/api/reports`,
-            {
-              method: "GET",
-              headers: getUserHeaders(),
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Unable to load reports"
-          );
-        }
-
-        setReports(
-          data.reports || []
-        );
-      } catch (error) {
-        console.error(
-          "Load Reports Error:",
-          error
-        );
-      }
-    }, []);
+      setReports(data.reports || []);
+    } catch (error) {
+      console.error("Load Reports Error:", error);
+    }
+  }, []);
   useEffect(() => {
     loadPatients();
     loadStudies();
     loadReports();
-  }, [
-    loadPatients,
-    loadStudies,
-    loadReports,
-  ]);
-    const getPatient = (patientId) => {
-    return patients.find(
-      (patient) =>
-        Number(patient.id) ===
-        Number(patientId)
-    );
+  }, [loadPatients, loadStudies, loadReports]);
+  const getPatient = (patientId) => {
+    return patients.find((patient) => Number(patient.id) === Number(patientId));
   };
 
   const getStudyReport = (studyId) => {
-    return reports.find(
-      (report) =>
-        Number(report.studyId) ===
-        Number(studyId)
-    );
+    return reports.find((report) => Number(report.studyId) === Number(studyId));
   };
 
   const handleCreateReport = (study) => {
     setReportForm({
       studyId: String(study.id),
-      radiologistName:
-        getLoggedInUser()?.fullName || "",
+      radiologistName: getStoredUser()?.fullName || "",
       findings: "",
       impression: "",
       status: "Completed",
@@ -330,62 +213,43 @@ function Studies() {
   };
 
   const handleReportChange = (event) => {
-    const {
-      name,
-      value,
-    } = event.target;
+    const { name, value } = event.target;
 
-    setReportForm(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    );
+    setReportForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   };
 
   const handleSaveReport = async () => {
     if (!reportForm.studyId) {
-      alert(
-        "Study information is missing."
-      );
+      alert("Study information is missing.");
 
       return;
     }
 
-    if (
-      !reportForm.radiologistName.trim()
-    ) {
-      alert(
-        "Please enter radiologist name."
-      );
+    if (!reportForm.radiologistName.trim()) {
+      alert("Please enter radiologist name.");
 
       return;
     }
 
     if (!reportForm.findings.trim()) {
-      alert(
-        "Please enter clinical findings."
-      );
+      alert("Please enter clinical findings.");
 
       return;
     }
 
-    if (
-      !reportForm.impression.trim()
-    ) {
-      alert(
-        "Please enter final impression."
-      );
+    if (!reportForm.impression.trim()) {
+      alert("Please enter final impression.");
 
       return;
     }
 
-    const userId = getUserId();
+    const userId = getCurrentUserId();
 
     if (!userId) {
-      alert(
-        "Your login session was not found. Please login again."
-      );
+      alert("Your login session was not found. Please login again.");
 
       navigate("/");
 
@@ -395,72 +259,44 @@ function Studies() {
     try {
       setSavingReport(true);
 
-      const selectedStudy =
-        studies.find(
-          (study) =>
-            Number(study.id) ===
-            Number(reportForm.studyId)
-        );
+      const selectedStudy = studies.find(
+        (study) => Number(study.id) === Number(reportForm.studyId)
+      );
 
       if (!selectedStudy) {
-        alert(
-          "Study information could not be found."
-        );
+        alert("Study information could not be found.");
 
         return;
       }
 
       const payload = {
-        patientId:
-          Number(
-            selectedStudy.patientId
-          ),
+        patientId: Number(selectedStudy.patientId),
 
-        studyId:
-          Number(
-            reportForm.studyId
-          ),
-        radiologistName:
-          reportForm.radiologistName.trim(),
+        studyId: Number(reportForm.studyId),
+        radiologistName: reportForm.radiologistName.trim(),
 
-        findings:
-          reportForm.findings.trim(),
+        findings: reportForm.findings.trim(),
 
-        impression:
-          reportForm.impression.trim(),
+        impression: reportForm.impression.trim(),
 
         status: "Completed",
       };
 
-      const response =
-        await fetch(
-          `${API_URL}/api/reports`,
-          {
-            method: "POST",
-            headers:
-              getUserHeaders(),
-            body:
-              JSON.stringify(
-                payload
-              ),
-          }
-        );
+      const response = await fetch(`${API_URL}/api/reports`, {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+      });
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        alert(
-          data.message ||
-            "Unable to create report"
-        );
+        alert(data.message || "Unable to create report");
 
         return;
       }
 
-      alert(
-        "Report created successfully"
-      );
+      alert("Report created successfully");
 
       setOpenReportForm(false);
 
@@ -474,35 +310,24 @@ function Studies() {
 
       await loadReports();
     } catch (error) {
-      console.error(
-        "Create Report Error:",
-        error
-      );
+      console.error("Create Report Error:", error);
 
-      alert(
-        "Cannot connect to backend server."
-      );
+      alert("Cannot connect to backend server.");
     } finally {
       setSavingReport(false);
     }
   };
 
   const handleViewReport = (study) => {
-    const report =
-      getStudyReport(study.id);
+    const report = getStudyReport(study.id);
 
     if (!report) {
-      alert(
-        "No report is available for this study."
-      );
+      alert("No report is available for this study.");
 
       return;
     }
 
-    const patient =
-      getPatient(
-        study.patientId
-      );
+    const patient = getPatient(study.patientId);
 
     navigate("/reports", {
       state: {
@@ -513,101 +338,45 @@ function Studies() {
     });
   };
 
-  const filteredStudies =
-    useMemo(() => {
-      const searchText =
-        search
-          .trim()
-          .toLowerCase();
+  const filteredStudies = useMemo(() => {
+    const searchText = search.trim().toLowerCase();
 
-      return studies.filter(
-        (study) => {
-          const patientName =
-            String(
-              study.patientName ||
-                getPatientName(
-                  patients,
-                  study.patientId
-                ) ||
-                ""
-            ).toLowerCase();
+    return studies.filter((study) => {
+      const patientName = String(
+        study.patientName || getPatientName(patients, study.patientId) || ""
+      ).toLowerCase();
 
-          const studyId =
-            String(
-              study.studyId || ""
-            ).toLowerCase();
+      const studyId = String(study.studyId || "").toLowerCase();
 
-          const modality =
-            String(
-              study.modality || ""
-            ).toLowerCase();
+      const modality = String(study.modality || "").toLowerCase();
 
-          const bodyPart =
-            String(
-              study.bodyPart || ""
-            ).toLowerCase();
+      const bodyPart = String(study.bodyPart || "").toLowerCase();
 
-          const matchesSearch =
-            !searchText ||
-            patientName.includes(
-              searchText
-            ) ||
-            studyId.includes(
-              searchText
-            ) ||
-            modality.includes(
-              searchText
-            ) ||
-            bodyPart.includes(
-              searchText
-            );
+      const matchesSearch =
+        !searchText ||
+        patientName.includes(searchText) ||
+        studyId.includes(searchText) ||
+        modality.includes(searchText) ||
+        bodyPart.includes(searchText);
 
-          const matchesModality =
-            !modalityFilter ||
-            study.modality ===
-              modalityFilter;
+      const matchesModality = !modalityFilter || study.modality === modalityFilter;
 
-          const matchesPatient =
-            !patientFromPatientsPage ||
-            Number(
-              study.patientId
-            ) ===
-              Number(
-                patientFromPatientsPage.id
-              );
+      const matchesPatient =
+        !patientFromPatientsPage || Number(study.patientId) === Number(patientFromPatientsPage.id);
 
-          return (
-            matchesSearch &&
-            matchesModality &&
-            matchesPatient
-          );
-        }
-      );
-    }, [
-      studies,
-      patients,
-      search,
-      modalityFilter,
-      patientFromPatientsPage,
-    ]);
+      return matchesSearch && matchesModality && matchesPatient;
+    });
+  }, [studies, patients, search, modalityFilter, patientFromPatientsPage]);
 
   const handleOpenStudyForm = () => {
     setEditingStudy(null);
 
     setFormData({
-      patientId:
-        patientFromPatientsPage?.id
-          ? String(
-              patientFromPatientsPage.id
-            )
-          : "",
+      patientId: patientFromPatientsPage?.id ? String(patientFromPatientsPage.id) : "",
       studyId: "",
       modality: "",
       bodyPart: "",
-      studyDate:
-        new Date()
-          .toISOString()
-          .split("T")[0],
+      studyDate: new Date().toISOString().split("T")[0],
       status: "Completed",
     });
 
@@ -618,33 +387,17 @@ function Studies() {
     setEditingStudy(study);
 
     setFormData({
-      patientId:
-        study.patientId
-          ? String(
-              study.patientId
-            )
-          : "",
+      patientId: study.patientId ? String(study.patientId) : "",
 
-      studyId:
-        study.studyId || "",
+      studyId: study.studyId || "",
 
-      modality:
-        study.modality || "",
+      modality: study.modality || "",
 
-      bodyPart:
-        study.bodyPart || "",
+      bodyPart: study.bodyPart || "",
 
-      studyDate:
-        study.studyDate
-          ? study.studyDate.substring(
-              0,
-              10
-            )
-          : "",
+      studyDate: study.studyDate ? study.studyDate.substring(0, 10) : "",
 
-      status:
-        study.status ||
-        "Completed",
+      status: study.status || "Completed",
     });
 
     setOpenStudyForm(true);
@@ -665,19 +418,14 @@ function Studies() {
   };
 
   const handleStudyChange = (event) => {
-    const {
-      name,
-      value,
-    } = event.target;
+    const { name, value } = event.target;
 
-    setFormData(
-      (previous) => ({
-        ...previous,
-        [name]: value,
-      })
-    );
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   };
-    const handleSaveStudy = async () => {
+  const handleSaveStudy = async () => {
     if (
       !formData.patientId ||
       !formData.studyId ||
@@ -686,19 +434,15 @@ function Studies() {
       !formData.studyDate ||
       !formData.status
     ) {
-      alert(
-        "Please fill all study fields."
-      );
+      alert("Please fill all study fields.");
 
       return;
     }
 
-    const userId = getUserId();
+    const userId = getCurrentUserId();
 
     if (!userId) {
-      alert(
-        "Your login session was not found. Please login again."
-      );
+      alert("Your login session was not found. Please login again.");
 
       navigate("/");
 
@@ -709,172 +453,114 @@ function Studies() {
       let response;
 
       if (editingStudy) {
-        response = await fetch(
-          `${API_URL}/api/studies/${editingStudy.id}`,
-          {
-            method: "PUT",
-            headers: getUserHeaders(),
-            body: JSON.stringify(
-              formData
-            ),
-          }
-        );
+        response = await fetch(`${API_URL}/api/studies/${editingStudy.id}`, {
+          method: "PUT",
+          headers: jsonHeaders(),
+          body: JSON.stringify(formData),
+        });
       } else {
-        response = await fetch(
-          `${API_URL}/api/studies`,
-          {
-            method: "POST",
-            headers: getUserHeaders(),
-            body: JSON.stringify(
-              formData
-            ),
-          }
-        );
+        response = await fetch(`${API_URL}/api/studies`, {
+          method: "POST",
+          headers: jsonHeaders(),
+          body: JSON.stringify(formData),
+        });
       }
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        alert(
-          data.message ||
-            "Unable to save study"
-        );
+        alert(data.message || "Unable to save study");
 
         return;
       }
 
-      alert(
-        editingStudy
-          ? "Study updated successfully"
-          : "Study added successfully"
-      );
+      alert(editingStudy ? "Study updated successfully" : "Study added successfully");
 
       handleCloseStudyForm();
 
       await loadStudies();
     } catch (error) {
-      console.error(
-        "Save Study Error:",
-        error
-      );
+      console.error("Save Study Error:", error);
 
-      alert(
-        "Cannot connect to backend server."
-      );
+      alert("Cannot connect to backend server.");
     }
   };
 
-  const handleDeleteStudy =
-    async (studyId) => {
-      const confirmed =
-        window.confirm(
-          "Are you sure you want to delete this study?"
-        );
+  const handleDeleteStudy = async (studyId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this study?");
 
-      if (!confirmed) {
-        return;
-      }
+    if (!confirmed) {
+      return;
+    }
 
-      const userId = getUserId();
+    const userId = getCurrentUserId();
 
-      if (!userId) {
-        alert(
-          "Your login session was not found. Please login again."
-        );
+    if (!userId) {
+      alert("Your login session was not found. Please login again.");
 
-        navigate("/");
+      navigate("/");
 
-        return;
-      }
+      return;
+    }
 
-      try {
-        const response =
-          await fetch(
-            `${API_URL}/api/studies/${studyId}`,
-            {
-              method: "DELETE",
-              headers:
-                getUserHeaders(),
-            }
-          );
+    try {
+      const response = await fetch(`${API_URL}/api/studies/${studyId}`, {
+        method: "DELETE",
+        headers: jsonHeaders(),
+      });
 
-        const data =
-          await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-          alert(
-            data.message ||
-              "Unable to delete study"
-          );
-
-          return;
-        }
-
-        alert(
-          "Study deleted successfully"
-        );
-
-        await loadStudies();
-        await loadReports();
-      } catch (error) {
-        console.error(
-          "Delete Study Error:",
-          error
-        );
-
-        alert(
-          "Cannot connect to backend server."
-        );
-      }
-    };
-
-  const handleViewStudy =
-    (study) => {
-      const patient =
-        getPatient(
-          study.patientId
-        );
-
-      if (!patient) {
-        alert(
-          "Patient information could not be found."
-        );
+      if (!response.ok) {
+        alert(data.message || "Unable to delete study");
 
         return;
       }
 
-      navigate(
-        "/viewer",
-        {
-          state: {
-            patient,
-            study,
-          },
-        }
-      );
-    };
+      alert("Study deleted successfully");
 
-  const handleClearFilters =
-    () => {
-      setSearch("");
-      setModalityFilter("");
-    };
+      await loadStudies();
+      await loadReports();
+    } catch (error) {
+      console.error("Delete Study Error:", error);
+
+      alert("Cannot connect to backend server.");
+    }
+  };
+
+  const handleViewStudy = (study) => {
+    const patient = getPatient(study.patientId);
+
+    if (!patient) {
+      alert("Patient information could not be found.");
+
+      return;
+    }
+
+    navigate("/viewer", {
+      state: {
+        patient,
+        study,
+      },
+    });
+  };
+
+  const handleClearFilters = () => {
+    setSearch("");
+    setModalityFilter("");
+  };
 
   const handleBack = () => {
-    if (
-      patientFromPatientsPage
-    ) {
+    if (patientFromPatientsPage) {
       navigate("/patients");
     } else {
       navigate("/dashboard");
     }
   };
 
-  const pageTitle =
-    patientFromPatientsPage
-      ? `Studies - ${patientFromPatientsPage.name}`
-      : "Study List";
+  const pageTitle = patientFromPatientsPage
+    ? `Studies - ${patientFromPatientsPage.name}`
+    : "Study List";
 
   return (
     <Layout>
@@ -887,46 +573,23 @@ function Studies() {
         flexWrap="wrap"
       >
         <Box>
-          <Typography
-            variant="h4"
-            fontWeight="bold"
-          >
+          <Typography variant="h4" fontWeight="bold">
             {pageTitle}
           </Typography>
 
-          <Typography
-            color="text.secondary"
-            mt={1}
-          >
+          <Typography color="text.secondary" mt={1}>
             {patientFromPatientsPage
               ? "Manage medical studies for this patient"
               : "View and manage all medical studies"}
           </Typography>
         </Box>
 
-        <Stack
-          direction="row"
-          spacing={2}
-        >
-          <Button
-            variant="outlined"
-            startIcon={
-              <ArrowBackIcon />
-            }
-            onClick={handleBack}
-          >
+        <Stack direction="row" spacing={2}>
+          <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={handleBack}>
             Back
           </Button>
 
-          <Button
-            variant="contained"
-            startIcon={
-              <AddIcon />
-            }
-            onClick={
-              handleOpenStudyForm
-            }
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenStudyForm}>
             Add Study
           </Button>
         </Stack>
@@ -957,16 +620,10 @@ function Studies() {
             label="Search Study"
             placeholder="Patient, Study ID, modality..."
             value={search}
-            onChange={(event) =>
-              setSearch(
-                event.target.value
-              )
-            }
+            onChange={(event) => setSearch(event.target.value)}
             InputProps={{
               startAdornment: (
-                <InputAdornment
-                  position="start"
-                >
+                <InputAdornment position="start">
                   <SearchIcon />
                 </InputAdornment>
               ),
@@ -978,46 +635,23 @@ function Studies() {
             fullWidth
             size="small"
             label="Modality"
-            value={
-              modalityFilter
-            }
-            onChange={(event) =>
-              setModalityFilter(
-                event.target.value
-              )
-            }
+            value={modalityFilter}
+            onChange={(event) => setModalityFilter(event.target.value)}
           >
-            <MenuItem value="">
-              All Modalities
-            </MenuItem>
+            <MenuItem value="">All Modalities</MenuItem>
 
-            <MenuItem value="X-Ray">
-              X-Ray
-            </MenuItem>
+            <MenuItem value="X-Ray">X-Ray</MenuItem>
 
-            <MenuItem value="CT Scan">
-              CT Scan
-            </MenuItem>
+            <MenuItem value="CT Scan">CT Scan</MenuItem>
 
-            <MenuItem value="MRI">
-              MRI
-            </MenuItem>
+            <MenuItem value="MRI">MRI</MenuItem>
 
-            <MenuItem value="Ultrasound">
-              Ultrasound
-            </MenuItem>
+            <MenuItem value="Ultrasound">Ultrasound</MenuItem>
 
-            <MenuItem value="Mammography">
-              Mammography
-            </MenuItem>
+            <MenuItem value="Mammography">Mammography</MenuItem>
           </TextField>
 
-          <Button
-            variant="outlined"
-            onClick={
-              handleClearFilters
-            }
-          >
+          <Button variant="outlined" onClick={handleClearFilters}>
             Clear
           </Button>
         </Box>
@@ -1043,45 +677,31 @@ function Studies() {
             <TableHead>
               <TableRow>
                 <TableCell>
-                  <strong>
-                    Patient
-                  </strong>
+                  <strong>Patient</strong>
                 </TableCell>
 
                 <TableCell>
-                  <strong>
-                    Study ID
-                  </strong>
+                  <strong>Study ID</strong>
                 </TableCell>
 
                 <TableCell>
-                  <strong>
-                    Modality
-                  </strong>
+                  <strong>Modality</strong>
                 </TableCell>
 
                 <TableCell>
-                  <strong>
-                    Body Part
-                  </strong>
+                  <strong>Body Part</strong>
                 </TableCell>
 
                 <TableCell>
-                  <strong>
-                    Study Date
-                  </strong>
+                  <strong>Study Date</strong>
                 </TableCell>
 
                 <TableCell align="center">
-                  <strong>
-                    Images
-                  </strong>
+                  <strong>Images</strong>
                 </TableCell>
 
                 <TableCell align="center">
-                  <strong>
-                    Actions
-                  </strong>
+                  <strong>Actions</strong>
                 </TableCell>
               </TableRow>
             </TableHead>
@@ -1108,217 +728,121 @@ function Studies() {
                       py: 6,
                     }}
                   >
-                    <Typography
-                      color="text.secondary"
-                    >
-                      No studies found.
-                    </Typography>
+                    <Typography color="text.secondary">No studies found.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredStudies.map(
-                  (study) => {
-                    const patient =
-                      getPatient(
-                        study.patientId
-                      );
+                filteredStudies.map((study) => {
+                  const patient = getPatient(study.patientId);
 
-                    const report =
-                      getStudyReport(
-                        study.id
-                      );
+                  const report = getStudyReport(study.id);
 
-                    return (
-                      <TableRow
-                        key={study.id}
-                        hover
-                      >
-                        <TableCell>
-                          <Typography
-                            fontWeight="bold"
-                          >
-                            {study.patientName ||
-                              patient?.name ||
-                              "-"}
-                          </Typography>
+                  return (
+                    <TableRow key={study.id} hover>
+                      <TableCell>
+                        <Typography fontWeight="bold">
+                          {study.patientName || patient?.name || "-"}
+                        </Typography>
 
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            ID:{" "}
-                            {study.patientId}
-                          </Typography>
-                        </TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          ID: {study.patientId}
+                        </Typography>
+                      </TableCell>
 
-                        <TableCell>
-                          <Typography
-                            fontWeight="bold"
-                          >
-                            {study.studyId ||
-                              "-"}
-                          </Typography>
-                        </TableCell>
+                      <TableCell>
+                        <Typography fontWeight="bold">{study.studyId || "-"}</Typography>
+                      </TableCell>
 
-                        <TableCell>
-                          {study.modality ||
-                            "-"}
-                        </TableCell>
+                      <TableCell>{study.modality || "-"}</TableCell>
 
-                        <TableCell>
-                          {study.bodyPart ||
-                            "-"}
-                        </TableCell>
+                      <TableCell>{study.bodyPart || "-"}</TableCell>
 
-                        <TableCell>
-                          {study.studyDate
-                            ? new Date(
-                                study.studyDate
-                              ).toLocaleDateString(
-                                "en-IN"
-                              )
-                            : "-"}
-                        </TableCell>
+                      <TableCell>
+                        {study.studyDate
+                          ? new Date(study.studyDate).toLocaleDateString("en-IN")
+                          : "-"}
+                      </TableCell>
 
-                        <TableCell align="center">
-                          <Stack
-                            direction="row"
-                            justifyContent="center"
-                            alignItems="center"
-                            spacing={0.5}
-                          >
-                            <ImageIcon
-                              fontSize="small"
-                              color={
-                                Number(
-                                  study.imageCount ||
-                                    0
-                                ) > 0
-                                  ? "primary"
-                                  : "disabled"
-                              }
-                            />
+                      <TableCell align="center">
+                        <Stack
+                          direction="row"
+                          justifyContent="center"
+                          alignItems="center"
+                          spacing={0.5}
+                        >
+                          <ImageIcon
+                            fontSize="small"
+                            color={Number(study.imageCount || 0) > 0 ? "primary" : "disabled"}
+                          />
 
-                            <Typography
-                              fontWeight="bold"
-                            >
-                              {Number(
-                                study.imageCount ||
-                                  0
-                              )}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
+                          <Typography fontWeight="bold">{Number(study.imageCount || 0)}</Typography>
+                        </Stack>
+                      </TableCell>
 
-                        <TableCell align="center">
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            justifyContent="center"
-                            flexWrap="wrap"
-                          >
-                            {report ? (
-                              <Button
-                                variant="outlined"
-                                color="success"
-                                size="small"
-                                startIcon={
-                                  <VisibilityIcon />
-                                }
-                                onClick={() =>
-                                  handleViewReport(
-                                    study
-                                  )
-                                }
-                              >
-                                View Report
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="contained"
-                                color="success"
-                                size="small"
-                                startIcon={
-                                  <DescriptionIcon />
-                                }
-                                onClick={() =>
-                                  handleCreateReport(
-                                    study
-                                  )
-                                }
-                              >
-                                Create Report
-                              </Button>
-                            )}
-
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={
-                                <VisibilityIcon />
-                              }
-                              onClick={() =>
-                                handleViewStudy(
-                                  study
-                                )
-                              }
-                            >
-                              View
-                            </Button>
-
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                          {report ? (
                             <Button
                               variant="outlined"
+                              color="success"
                               size="small"
-                              startIcon={
-                                <EditIcon />
-                              }
-                              onClick={() =>
-                                handleEditStudy(
-                                  study
-                                )
-                              }
+                              startIcon={<VisibilityIcon />}
+                              onClick={() => handleViewReport(study)}
                             >
-                              Edit
+                              View Report
                             </Button>
-
+                          ) : (
                             <Button
                               variant="contained"
-                              color="error"
+                              color="success"
                               size="small"
-                              startIcon={
-                                <DeleteIcon />
-                              }
-                              onClick={() =>
-                                handleDeleteStudy(
-                                  study.id
-                                )
-                              }
+                              startIcon={<DescriptionIcon />}
+                              onClick={() => handleCreateReport(study)}
                             >
-                              Delete
+                              Create Report
                             </Button>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  }
-                )
+                          )}
+
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<VisibilityIcon />}
+                            onClick={() => handleViewStudy(study)}
+                          >
+                            View
+                          </Button>
+
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<EditIcon />}
+                            onClick={() => handleEditStudy(study)}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            variant="contained"
+                            color="error"
+                            size="small"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleDeleteStudy(study.id)}
+                          >
+                            Delete
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </TableContainer>
       </Paper>
-            {/* ADD / EDIT STUDY DIALOG */}
-      <Dialog
-        open={openStudyForm}
-        onClose={handleCloseStudyForm}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          {editingStudy
-            ? "Edit Study"
-            : "Add New Study"}
-        </DialogTitle>
+      {/* ADD / EDIT STUDY DIALOG */}
+      <Dialog open={openStudyForm} onClose={handleCloseStudyForm} fullWidth maxWidth="sm">
+        <DialogTitle>{editingStudy ? "Edit Study" : "Add New Study"}</DialogTitle>
 
         <DialogContent>
           <TextField
@@ -1329,19 +853,12 @@ function Studies() {
             value={formData.patientId}
             onChange={handleStudyChange}
             margin="normal"
-            disabled={Boolean(
-              patientFromPatientsPage
-            )}
+            disabled={Boolean(patientFromPatientsPage)}
           >
-            <MenuItem value="">
-              Select Patient
-            </MenuItem>
+            <MenuItem value="">Select Patient</MenuItem>
 
             {patients.map((patient) => (
-              <MenuItem
-                key={patient.id}
-                value={patient.id}
-              >
+              <MenuItem key={patient.id} value={patient.id}>
                 {patient.name}
                 {" (ID: "}
                 {patient.id}
@@ -1369,29 +886,17 @@ function Studies() {
             onChange={handleStudyChange}
             margin="normal"
           >
-            <MenuItem value="">
-              Select Modality
-            </MenuItem>
+            <MenuItem value="">Select Modality</MenuItem>
 
-            <MenuItem value="X-Ray">
-              X-Ray
-            </MenuItem>
+            <MenuItem value="X-Ray">X-Ray</MenuItem>
 
-            <MenuItem value="CT Scan">
-              CT Scan
-            </MenuItem>
+            <MenuItem value="CT Scan">CT Scan</MenuItem>
 
-            <MenuItem value="MRI">
-              MRI
-            </MenuItem>
+            <MenuItem value="MRI">MRI</MenuItem>
 
-            <MenuItem value="Ultrasound">
-              Ultrasound
-            </MenuItem>
+            <MenuItem value="Ultrasound">Ultrasound</MenuItem>
 
-            <MenuItem value="Mammography">
-              Mammography
-            </MenuItem>
+            <MenuItem value="Mammography">Mammography</MenuItem>
           </TextField>
 
           <TextField
@@ -1426,79 +931,36 @@ function Studies() {
             onChange={handleStudyChange}
             margin="normal"
           >
-            <MenuItem value="Scheduled">
-              Scheduled
-            </MenuItem>
+            <MenuItem value="Scheduled">Scheduled</MenuItem>
 
-            <MenuItem value="In Progress">
-              In Progress
-            </MenuItem>
+            <MenuItem value="In Progress">In Progress</MenuItem>
 
-            <MenuItem value="Completed">
-              Completed
-            </MenuItem>
+            <MenuItem value="Completed">Completed</MenuItem>
 
-            <MenuItem value="Cancelled">
-              Cancelled
-            </MenuItem>
+            <MenuItem value="Cancelled">Cancelled</MenuItem>
           </TextField>
         </DialogContent>
 
         <DialogActions>
-          <Button
-            onClick={
-              handleCloseStudyForm
-            }
-          >
-            Cancel
-          </Button>
+          <Button onClick={handleCloseStudyForm}>Cancel</Button>
 
-          <Button
-            variant="contained"
-            onClick={
-              handleSaveStudy
-            }
-          >
-            {editingStudy
-              ? "Update Study"
-              : "Save Study"}
+          <Button variant="contained" onClick={handleSaveStudy}>
+            {editingStudy ? "Update Study" : "Save Study"}
           </Button>
         </DialogActions>
       </Dialog>
 
-
       {/* CREATE REPORT DIALOG */}
-      <Dialog
-        open={openReportForm}
-        onClose={
-          handleCloseReportForm
-        }
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>
-          Create Report
-        </DialogTitle>
+      <Dialog open={openReportForm} onClose={handleCloseReportForm} fullWidth maxWidth="md">
+        <DialogTitle>Create Report</DialogTitle>
 
         <DialogContent>
           {(() => {
-            const selectedStudy =
-              studies.find(
-                (study) =>
-                  Number(
-                    study.id
-                  ) ===
-                  Number(
-                    reportForm.studyId
-                  )
-              );
+            const selectedStudy = studies.find(
+              (study) => Number(study.id) === Number(reportForm.studyId)
+            );
 
-            const selectedPatient =
-              selectedStudy
-                ? getPatient(
-                    selectedStudy.patientId
-                  )
-                : null;
+            const selectedPatient = selectedStudy ? getPatient(selectedStudy.patientId) : null;
 
             return (
               <Box>
@@ -1511,20 +973,12 @@ function Studies() {
                     borderRadius: 2,
                   }}
                 >
-                  <Typography
-                    variant="subtitle2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="subtitle2" color="text.secondary">
                     Patient
                   </Typography>
 
-                  <Typography
-                    fontWeight="bold"
-                    mb={2}
-                  >
-                    {selectedStudy?.patientName ||
-                      selectedPatient?.name ||
-                      "-"}
+                  <Typography fontWeight="bold" mb={2}>
+                    {selectedStudy?.patientName || selectedPatient?.name || "-"}
                   </Typography>
 
                   <Divider
@@ -1533,30 +987,16 @@ function Studies() {
                     }}
                   />
 
-                  <Typography
-                    variant="subtitle2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="subtitle2" color="text.secondary">
                     Study ID
                   </Typography>
 
-                  <Typography
-                    fontWeight="bold"
-                  >
-                    {selectedStudy?.studyId ||
-                      "-"}
-                  </Typography>
+                  <Typography fontWeight="bold">{selectedStudy?.studyId || "-"}</Typography>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    mt={1}
-                  >
-                    {selectedStudy?.modality ||
-                      "-"}
+                  <Typography variant="body2" color="text.secondary" mt={1}>
+                    {selectedStudy?.modality || "-"}
                     {" • "}
-                    {selectedStudy?.bodyPart ||
-                      "-"}
+                    {selectedStudy?.bodyPart || "-"}
                   </Typography>
                 </Paper>
 
@@ -1564,12 +1004,8 @@ function Studies() {
                   fullWidth
                   label="Radiologist Name"
                   name="radiologistName"
-                  value={
-                    reportForm.radiologistName
-                  }
-                  onChange={
-                    handleReportChange
-                  }
+                  value={reportForm.radiologistName}
+                  onChange={handleReportChange}
                   margin="normal"
                   required
                 />
@@ -1580,12 +1016,8 @@ function Studies() {
                   minRows={6}
                   label="Clinical Findings"
                   name="findings"
-                  value={
-                    reportForm.findings
-                  }
-                  onChange={
-                    handleReportChange
-                  }
+                  value={reportForm.findings}
+                  onChange={handleReportChange}
                   margin="normal"
                   required
                   placeholder="Enter detailed clinical findings..."
@@ -1597,12 +1029,8 @@ function Studies() {
                   minRows={5}
                   label="Final Impression"
                   name="impression"
-                  value={
-                    reportForm.impression
-                  }
-                  onChange={
-                    handleReportChange
-                  }
+                  value={reportForm.impression}
+                  onChange={handleReportChange}
                   margin="normal"
                   required
                   placeholder="Enter final impression..."
@@ -1616,23 +1044,12 @@ function Studies() {
                     borderRadius: 2,
                   }}
                 >
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                  >
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="body2" color="text.secondary">
                       Report Status:
                     </Typography>
 
-                    <Chip
-                      label="Completed"
-                      color="success"
-                      size="small"
-                    />
+                    <Chip label="Completed" color="success" size="small" />
                   </Stack>
                 </Paper>
               </Box>
@@ -1641,12 +1058,7 @@ function Studies() {
         </DialogContent>
 
         <DialogActions>
-          <Button
-            onClick={
-              handleCloseReportForm
-            }
-            disabled={savingReport}
-          >
+          <Button onClick={handleCloseReportForm} disabled={savingReport}>
             Cancel
           </Button>
 
@@ -1654,23 +1066,12 @@ function Studies() {
             variant="contained"
             color="success"
             startIcon={
-              savingReport ? (
-                <CircularProgress
-                  size={18}
-                  color="inherit"
-                />
-              ) : (
-                <DescriptionIcon />
-              )
+              savingReport ? <CircularProgress size={18} color="inherit" /> : <DescriptionIcon />
             }
-            onClick={
-              handleSaveReport
-            }
+            onClick={handleSaveReport}
             disabled={savingReport}
           >
-            {savingReport
-              ? "Creating..."
-              : "Create Report"}
+            {savingReport ? "Creating..." : "Create Report"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1678,16 +1079,8 @@ function Studies() {
   );
 }
 
-function getPatientName(
-  patients,
-  patientId
-) {
-  const patient =
-    patients.find(
-      (item) =>
-        Number(item.id) ===
-        Number(patientId)
-    );
+function getPatientName(patients, patientId) {
+  const patient = patients.find((item) => Number(item.id) === Number(patientId));
 
   return patient?.name || "";
 }

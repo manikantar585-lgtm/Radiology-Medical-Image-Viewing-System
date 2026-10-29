@@ -1,8 +1,4 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   Box,
@@ -30,602 +26,302 @@ import DoneAllIcon from "@mui/icons-material/DoneAll";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ArticleIcon from "@mui/icons-material/Article";
 
-
-import { API_URL, getStoredUser, jsonHeaders } from "../api/http";
-
+import { API_URL, jsonHeaders, getStoredUser, getCurrentUserId } from "../api/http";
 
 // =========================================================
 // USER HELPERS
 // =========================================================
 
-const getLoggedInUser = getStoredUser;
-
-
-function getUserId() {
-  const user =
-    getLoggedInUser();
-
-  return user?.id || null;
-}
-
-
 function getRadiologistName() {
-  const user =
-    getLoggedInUser();
+  const user = getStoredUser();
 
-  return (
-    user?.fullName ||
-    user?.name ||
-    user?.username ||
-    ""
-  );
+  return user?.fullName || user?.name || user?.username || "";
 }
-
 
 // =========================================================
 // SAFE VALUE HELPERS
 // =========================================================
 
-function getAIResult(
-  aiResult
-) {
-  if (
-    aiResult &&
-    aiResult.result
-  ) {
+function getAIResult(aiResult) {
+  if (aiResult && aiResult.result) {
     return aiResult.result;
   }
 
   return aiResult || {};
 }
 
-
-function formatConfidence(
-  value
-) {
-  if (
-    typeof value !==
-    "number"
-  ) {
+function formatConfidence(value) {
+  if (typeof value !== "number") {
     return null;
   }
 
-  return `${Math.round(
-    value * 100
-  )}%`;
+  return `${Math.round(value * 100)}%`;
 }
 
-
-function formatDateTime(
-  value
-) {
+function formatDateTime(value) {
   if (!value) {
     return "-";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return String(value);
   }
 
-  return date.toLocaleString(
-    "en-IN"
-  );
+  return date.toLocaleString("en-IN");
 }
-
 
 // =========================================================
 // COMPONENT
 // =========================================================
 
-function AIAnalysisPanel({
-  study,
-  analysisStatus,
-  findings = [],
-  aiResult = null,
-  onAnalyze,
-}) {
-  const [
-    editDialogOpen,
-    setEditDialogOpen,
-  ] = useState(false);
+function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null, onAnalyze }) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const [
-    reportFindings,
-    setReportFindings,
-  ] = useState("");
+  const [reportFindings, setReportFindings] = useState("");
 
-  const [
-    reportImpression,
-    setReportImpression,
-  ] = useState("");
+  const [reportImpression, setReportImpression] = useState("");
 
-  const [
-    radiologistName,
-    setRadiologistName,
-  ] = useState("");
+  const [radiologistName, setRadiologistName] = useState("");
 
-  const [
-    savingReport,
-    setSavingReport,
-  ] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
 
-  const [
-    reportSaved,
-    setReportSaved,
-  ] = useState(false);
+  const [reportSaved, setReportSaved] = useState(false);
 
-  const [
-    savedReportId,
-    setSavedReportId,
-  ] = useState(null);
+  const [savedReportId, setSavedReportId] = useState(null);
 
-  const [
-    saveMode,
-    setSaveMode,
-  ] = useState("Draft");
+  const [saveMode, setSaveMode] = useState("Draft");
 
-  const [
-    saveMessage,
-    setSaveMessage,
-  ] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
-  const [
-    saveError,
-    setSaveError,
-  ] = useState("");
+  const [saveError, setSaveError] = useState("");
 
-  const isProcessing =
-    analysisStatus ===
-    "processing";
+  const isProcessing = analysisStatus === "processing";
 
-  const isCompleted =
-    analysisStatus ===
-    "completed";
+  const isCompleted = analysisStatus === "completed";
 
-  const isError =
-    analysisStatus ===
-    "error";
-
+  const isError = analysisStatus === "error";
 
   // =======================================================
   // NORMALIZE RESULT
   // =======================================================
 
-  const normalizedResult =
-    useMemo(
-      () =>
-        getAIResult(
-          aiResult
-        ),
-      [aiResult]
-    );
+  const normalizedResult = useMemo(() => getAIResult(aiResult), [aiResult]);
 
+  const resultFindings = useMemo(() => {
+    if (Array.isArray(findings) && findings.length > 0) {
+      return findings;
+    }
 
-  const resultFindings =
-    useMemo(() => {
+    if (Array.isArray(normalizedResult?.findings)) {
+      return normalizedResult.findings;
+    }
 
-      if (
-        Array.isArray(
-          findings
-        ) &&
-        findings.length > 0
-      ) {
-        return findings;
-      }
+    return [];
+  }, [findings, normalizedResult]);
 
-      if (
-        Array.isArray(
-          normalizedResult?.findings
-        )
-      ) {
-        return normalizedResult.findings;
-      }
+  const report = normalizedResult?.report || {};
 
-      return [];
-
-    }, [
-      findings,
-      normalizedResult,
-    ]);
-
-
-  const report =
-    normalizedResult?.report ||
-    {};
-
-
-  const clinicalModel =
-    normalizedResult?.clinicalModel ||
-    {};
-
+  const clinicalModel = normalizedResult?.clinicalModel || {};
 
   const studyPrediction =
-    normalizedResult?.studyPrediction ||
-    normalizedResult
-      ?.clinicalModel
-      ?.studyPrediction ||
-    {};
+    normalizedResult?.studyPrediction || normalizedResult?.clinicalModel?.studyPrediction || {};
 
-
-  const metadata =
-    normalizedResult?.metadata ||
-    {};
-
+  const metadata = normalizedResult?.metadata || {};
 
   // =======================================================
   // INITIALIZE REPORT DRAFT
   // =======================================================
 
   useEffect(() => {
-
-    if (
-      !isCompleted
-    ) {
+    if (!isCompleted) {
       return;
     }
 
-    const initialFindings =
-      report?.findings ||
-      "";
+    const initialFindings = report?.findings || "";
 
-    const initialImpression =
-      report?.impression ||
-      "";
+    const initialImpression = report?.impression || "";
 
-    setReportFindings(
-      initialFindings
-    );
+    setReportFindings(initialFindings);
 
-    setReportImpression(
-      initialImpression
-    );
+    setReportImpression(initialImpression);
 
-    setRadiologistName(
-      getRadiologistName()
-    );
+    setRadiologistName(getRadiologistName());
 
-    setReportSaved(
-      false
-    );
+    setReportSaved(false);
 
-    setSaveMessage(
-      ""
-    );
+    setSaveMessage("");
 
-    setSaveError(
-      ""
-    );
-
-  }, [
-    isCompleted,
-    report?.findings,
-    report?.impression,
-  ]);
-
+    setSaveError("");
+  }, [isCompleted, report?.findings, report?.impression]);
 
   // =======================================================
   // REPORT EDITOR
   // =======================================================
 
-  const openReportEditor =
-    () => {
+  const openReportEditor = () => {
+    setReportFindings(report?.findings || "");
 
-      setReportFindings(
-        report?.findings ||
-        ""
-      );
+    setReportImpression(report?.impression || "");
 
-      setReportImpression(
-        report?.impression ||
-        ""
-      );
+    setRadiologistName(getRadiologistName());
 
-      setRadiologistName(
-        getRadiologistName()
-      );
+    setSaveError("");
 
-      setSaveError(
-        ""
-      );
+    setSaveMessage("");
 
-      setSaveMessage(
-        ""
-      );
+    setEditDialogOpen(true);
+  };
 
-      setEditDialogOpen(
-        true
-      );
-    };
+  const closeReportEditor = () => {
+    if (savingReport) {
+      return;
+    }
 
-
-  const closeReportEditor =
-    () => {
-
-      if (
-        savingReport
-      ) {
-        return;
-      }
-
-      setEditDialogOpen(
-        false
-      );
-    };
-
+    setEditDialogOpen(false);
+  };
 
   // =======================================================
   // SAVE / UPDATE REPORT
   // =======================================================
 
-  const handleSaveReport =
-    async (
-      requestedStatus = "Draft"
-    ) => {
+  const handleSaveReport = async (requestedStatus = "Draft") => {
+    setSaveError("");
 
-      setSaveError(
-        ""
-      );
+    setSaveMessage("");
 
-      setSaveMessage(
-        ""
-      );
+    const userId = getCurrentUserId();
 
-      const userId =
-        getUserId();
+    if (!userId) {
+      setSaveError("Your login session was not found. Please login again.");
 
-      if (!userId) {
-        setSaveError(
-          "Your login session was not found. Please login again."
-        );
+      return;
+    }
 
-        return;
-      }
+    const studyId = Number(study?.id);
 
-      const studyId =
-        Number(
-          study?.id
-        );
+    const patientId = Number(study?.patientId);
 
-      const patientId =
-        Number(
-          study?.patientId
-        );
+    if (!studyId) {
+      setSaveError("Study ID is not available.");
 
-      if (
-        !studyId
-      ) {
-        setSaveError(
-          "Study ID is not available."
-        );
+      return;
+    }
 
-        return;
-      }
+    if (!patientId) {
+      setSaveError("Patient ID is not available for this study.");
 
-      if (
-        !patientId
-      ) {
-        setSaveError(
-          "Patient ID is not available for this study."
-        );
+      return;
+    }
 
-        return;
-      }
+    if (!radiologistName.trim()) {
+      setSaveError("Please enter the radiologist name.");
 
-      if (
-        !radiologistName.trim()
-      ) {
-        setSaveError(
-          "Please enter the radiologist name."
-        );
+      return;
+    }
 
-        return;
-      }
+    if (!reportFindings.trim()) {
+      setSaveError("Please enter report findings.");
 
-      if (
-        !reportFindings.trim()
-      ) {
-        setSaveError(
-          "Please enter report findings."
-        );
+      return;
+    }
 
-        return;
-      }
+    if (!reportImpression.trim()) {
+      setSaveError("Please enter the report impression.");
 
-      if (
-        !reportImpression.trim()
-      ) {
-        setSaveError(
-          "Please enter the report impression."
-        );
+      return;
+    }
 
-        return;
-      }
+    try {
+      setSavingReport(true);
+
+      setSaveMode(requestedStatus);
+
+      const payload = {
+        patientId: patientId,
+
+        studyId: studyId,
+
+        radiologistName: radiologistName.trim(),
+
+        findings: reportFindings.trim(),
+
+        impression: reportImpression.trim(),
+
+        status: requestedStatus,
+      };
+
+      const url = savedReportId
+        ? `${API_URL}/api/reports/${savedReportId}`
+        : `${API_URL}/api/reports`;
+
+      const method = savedReportId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+
+        headers: jsonHeaders(),
+
+        body: JSON.stringify(payload),
+      });
+
+      let data = {};
 
       try {
-
-        setSavingReport(
-          true
-        );
-
-        setSaveMode(
-          requestedStatus
-        );
-
-        const payload =
-          {
-            patientId:
-              patientId,
-
-            studyId:
-              studyId,
-
-            radiologistName:
-              radiologistName.trim(),
-
-            findings:
-              reportFindings.trim(),
-
-            impression:
-              reportImpression.trim(),
-
-            status:
-              requestedStatus,
-          };
-
-
-        const url =
-          savedReportId
-            ? `${API_URL}/api/reports/${savedReportId}`
-            : `${API_URL}/api/reports`;
-
-
-        const method =
-          savedReportId
-            ? "PUT"
-            : "POST";
-
-
-        const response =
-          await fetch(
-            url,
-            {
-              method,
-
-              headers:
-                jsonHeaders(),
-
-              body:
-                JSON.stringify(
-                  payload
-                ),
-            }
-          );
-
-        let data = {};
-
-        try {
-          data =
-            await response.json();
-        } catch (
-          jsonError
-        ) {
-          data = {};
-        }
-
-        if (
-          !response.ok
-        ) {
-          throw new Error(
-            data.message ||
-            "Unable to save report"
-          );
-        }
-
-
-        const savedReport =
-          data.report ||
-          data.result ||
-          {};
-
-
-        if (
-          savedReport?.id
-        ) {
-          setSavedReportId(
-            savedReport.id
-          );
-        }
-
-        setReportSaved(
-          true
-        );
-
-        setSaveMessage(
-          savedReportId
-            ? (
-                requestedStatus ===
-                "Completed"
-                  ? "Report finalized successfully."
-                  : "Report draft updated successfully."
-              )
-            : (
-                requestedStatus ===
-                "Completed"
-                  ? "Report finalized successfully."
-                  : "Report draft saved successfully."
-              )
-        );
-
-      } catch (
-        error
-      ) {
-
-        console.error(
-          "AI Report Save Error:",
-          error
-        );
-
-        setReportSaved(
-          false
-        );
-
-        setSaveError(
-          error?.message ||
-          "Unable to save report."
-        );
-
-      } finally {
-
-        setSavingReport(
-          false
-        );
+        data = await response.json();
+      } catch (jsonError) {
+        data = {};
       }
-    };
 
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to save report");
+      }
+
+      const savedReport = data.report || data.result || {};
+
+      if (savedReport?.id) {
+        setSavedReportId(savedReport.id);
+      }
+
+      setReportSaved(true);
+
+      setSaveMessage(
+        savedReportId
+          ? requestedStatus === "Completed"
+            ? "Report finalized successfully."
+            : "Report draft updated successfully."
+          : requestedStatus === "Completed"
+            ? "Report finalized successfully."
+            : "Report draft saved successfully."
+      );
+    } catch (error) {
+      console.error("AI Report Save Error:", error);
+
+      setReportSaved(false);
+
+      setSaveError(error?.message || "Unable to save report.");
+    } finally {
+      setSavingReport(false);
+    }
+  };
 
   // =======================================================
   // MODEL / PREDICTION DISPLAY HELPERS
   // =======================================================
 
-  const predictionLabel =
-    studyPrediction?.label ||
-    "";
+  const predictionLabel = studyPrediction?.label || "";
 
-  const predictionConfidence =
-    formatConfidence(
-      studyPrediction?.confidence
-    );
+  const predictionConfidence = formatConfidence(studyPrediction?.confidence);
 
+  const modelName = clinicalModel?.name || normalizedResult?.model || "AI model";
 
-  const modelName =
-    clinicalModel?.name ||
-    normalizedResult?.model ||
-    "AI model";
+  const modelAvailable = Boolean(clinicalModel?.available);
 
+  const clinicalValidation = Boolean(clinicalModel?.clinicalValidation);
 
-  const modelAvailable =
-    Boolean(
-      clinicalModel?.available
-    );
-
-
-  const clinicalValidation =
-    Boolean(
-      clinicalModel?.clinicalValidation
-    );
-
-
-  const generatedAt =
-    metadata?.generatedAt ||
-    null;
-      // =======================================================
+  const generatedAt = metadata?.generatedAt || null;
+  // =======================================================
   // RENDER
   // =======================================================
 
@@ -645,7 +341,6 @@ function AIAnalysisPanel({
           flexDirection: "column",
         }}
       >
-
         {/* =================================================
             HEADER
         ================================================== */}
@@ -677,10 +372,7 @@ function AIAnalysisPanel({
                 }}
               />
 
-              <Typography
-                variant="subtitle1"
-                fontWeight="bold"
-              >
+              <Typography variant="subtitle1" fontWeight="bold">
                 AI Copilot
               </Typography>
             </Box>
@@ -691,19 +383,13 @@ function AIAnalysisPanel({
                 isProcessing
                   ? "Analyzing"
                   : isCompleted
-                  ? "Analysis complete"
-                  : isError
-                  ? "Analysis failed"
-                  : "Ready"
+                    ? "Analysis complete"
+                    : isError
+                      ? "Analysis failed"
+                      : "Ready"
               }
               color={
-                isProcessing
-                  ? "warning"
-                  : isCompleted
-                  ? "success"
-                  : isError
-                  ? "error"
-                  : "default"
+                isProcessing ? "warning" : isCompleted ? "success" : isError ? "error" : "default"
               }
               variant="outlined"
             />
@@ -727,7 +413,6 @@ function AIAnalysisPanel({
           }}
         />
 
-
         {/* =================================================
             STUDY INFORMATION
         ================================================== */}
@@ -737,7 +422,6 @@ function AIAnalysisPanel({
             p: 1.5,
           }}
         >
-
           <Typography
             variant="caption"
             sx={{
@@ -757,11 +441,7 @@ function AIAnalysisPanel({
               color: "#e2e8f0",
             }}
           >
-            {
-              study?.studyId ||
-              study?.id ||
-              "Unknown Study"
-            }
+            {study?.studyId || study?.id || "Unknown Study"}
           </Typography>
 
           <Box
@@ -772,14 +452,9 @@ function AIAnalysisPanel({
               flexWrap: "wrap",
             }}
           >
-
             <Chip
               size="small"
-              label={
-                study?.modality ||
-                normalizedResult?.modality ||
-                "Unknown"
-              }
+              label={study?.modality || normalizedResult?.modality || "Unknown"}
               sx={{
                 color: "#ffffff",
                 backgroundColor: "#26384a",
@@ -788,27 +463,20 @@ function AIAnalysisPanel({
 
             <Chip
               size="small"
-              label={
-                study?.bodyPart ||
-                normalizedResult?.bodyPart ||
-                "Body Part Unknown"
-              }
+              label={study?.bodyPart || normalizedResult?.bodyPart || "Body Part Unknown"}
               sx={{
                 color: "#cbd5e1",
                 backgroundColor: "#1e293b",
               }}
             />
-
           </Box>
         </Box>
-
 
         <Divider
           sx={{
             borderColor: "#263241",
           }}
         />
-
 
         {/* =================================================
             SCROLLABLE CONTENT
@@ -822,14 +490,12 @@ function AIAnalysisPanel({
             overflowY: "auto",
           }}
         >
-
           {/* =================================================
               IDLE
           ================================================== */}
 
           {analysisStatus === "idle" && (
             <Box>
-
               <Typography
                 variant="body2"
                 sx={{
@@ -838,19 +504,14 @@ function AIAnalysisPanel({
                   lineHeight: 1.6,
                 }}
               >
-                Run the AI Copilot on this study to begin
-                multimodal analysis.
+                Run the AI Copilot on this study to begin multimodal analysis.
               </Typography>
 
               <Button
                 fullWidth
                 variant="contained"
-                startIcon={
-                  <PlayArrowIcon />
-                }
-                onClick={
-                  onAnalyze
-                }
+                startIcon={<PlayArrowIcon />}
+                onClick={onAnalyze}
                 sx={{
                   textTransform: "none",
                   fontWeight: "bold",
@@ -858,10 +519,8 @@ function AIAnalysisPanel({
               >
                 Analyze Study
               </Button>
-
             </Box>
           )}
-
 
           {/* =================================================
               PROCESSING
@@ -874,10 +533,7 @@ function AIAnalysisPanel({
                 py: 5,
               }}
             >
-
-              <CircularProgress
-                size={38}
-              />
+              <CircularProgress size={38} />
 
               <Typography
                 variant="body2"
@@ -899,13 +555,10 @@ function AIAnalysisPanel({
                   lineHeight: 1.5,
                 }}
               >
-                Processing the available medical images
-                and generating structured AI results.
+                Processing the available medical images and generating structured AI results.
               </Typography>
-
             </Box>
           )}
-
 
           {/* =================================================
               ERROR
@@ -913,30 +566,22 @@ function AIAnalysisPanel({
 
           {isError && (
             <Box>
-
               <Alert
                 severity="error"
-                icon={
-                  <WarningAmberIcon sx={{ color: "#f87171" }} />
-                }
+                icon={<WarningAmberIcon sx={{ color: "#f87171" }} />}
                 sx={{
-                  backgroundColor:
-                    "rgba(127,29,29,0.18)",
+                  backgroundColor: "rgba(127,29,29,0.18)",
                   color: "#fecaca",
-                  border:
-                    "1px solid rgba(248,113,113,0.25)",
+                  border: "1px solid rgba(248,113,113,0.25)",
                 }}
               >
-                AI analysis failed. Check the Python AI
-                service and backend logs.
+                AI analysis failed. Check the Python AI service and backend logs.
               </Alert>
 
               <Button
                 fullWidth
                 variant="outlined"
-                onClick={
-                  onAnalyze
-                }
+                onClick={onAnalyze}
                 sx={{
                   mt: 2,
                   textTransform: "none",
@@ -946,10 +591,8 @@ function AIAnalysisPanel({
               >
                 Try Again
               </Button>
-
             </Box>
           )}
-
 
           {/* =================================================
               COMPLETED
@@ -957,7 +600,6 @@ function AIAnalysisPanel({
 
           {isCompleted && (
             <Box>
-
               {/* ---------------------------------------------
                   STATUS
               ---------------------------------------------- */}
@@ -970,7 +612,6 @@ function AIAnalysisPanel({
                   mb: 1.5,
                 }}
               >
-
                 <CheckCircleIcon
                   sx={{
                     color: "#66bb6a",
@@ -986,9 +627,7 @@ function AIAnalysisPanel({
                 >
                   Analysis completed
                 </Typography>
-
               </Box>
-
 
               {/* ---------------------------------------------
                   MODEL STATUS
@@ -998,14 +637,11 @@ function AIAnalysisPanel({
                 sx={{
                   p: 1.1,
                   mb: 1.4,
-                  border:
-                    "1px solid #202832",
+                  border: "1px solid #202832",
                   borderRadius: 1,
-                  backgroundColor:
-                    "#0d131a",
+                  backgroundColor: "#0d131a",
                 }}
               >
-
                 <Typography
                   sx={{
                     fontSize: 9,
@@ -1018,15 +654,8 @@ function AIAnalysisPanel({
                   AI MODEL
                 </Typography>
 
-                <Stack
-                  spacing={0.55}
-                >
-
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    spacing={1}
-                  >
+                <Stack spacing={0.55}>
+                  <Stack direction="row" justifyContent="space-between" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -1048,11 +677,7 @@ function AIAnalysisPanel({
                     </Typography>
                   </Stack>
 
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    spacing={1}
-                  >
+                  <Stack direction="row" justifyContent="space-between" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -1065,25 +690,15 @@ function AIAnalysisPanel({
                     <Typography
                       sx={{
                         fontSize: 9.5,
-                        color: modelAvailable
-                          ? "#86efac"
-                          : "#fbbf24",
+                        color: modelAvailable ? "#86efac" : "#fbbf24",
                         fontWeight: 700,
                       }}
                     >
-                      {
-                        modelAvailable
-                          ? "Inference available"
-                          : "Inference unavailable"
-                      }
+                      {modelAvailable ? "Inference available" : "Inference unavailable"}
                     </Typography>
                   </Stack>
 
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    spacing={1}
-                  >
+                  <Stack direction="row" justifyContent="space-between" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -1100,17 +715,11 @@ function AIAnalysisPanel({
                         fontWeight: 700,
                       }}
                     >
-                      {
-                        clinicalValidation
-                          ? "Validated"
-                          : "Not validated"
-                      }
+                      {clinicalValidation ? "Validated" : "Not validated"}
                     </Typography>
                   </Stack>
-
                 </Stack>
               </Box>
-
 
               {/* ---------------------------------------------
                   PREDICTION
@@ -1121,14 +730,11 @@ function AIAnalysisPanel({
                   sx={{
                     p: 1.2,
                     mb: 1.4,
-                    border:
-                      "1px solid #24364a",
+                    border: "1px solid #24364a",
                     borderRadius: 1.2,
-                    backgroundColor:
-                      "#101a25",
+                    backgroundColor: "#101a25",
                   }}
                 >
-
                   <Typography
                     sx={{
                       fontSize: 9,
@@ -1147,7 +753,6 @@ function AIAnalysisPanel({
                     alignItems="center"
                     spacing={1}
                   >
-
                     <Typography
                       sx={{
                         fontSize: 12,
@@ -1161,18 +766,14 @@ function AIAnalysisPanel({
                     {predictionConfidence && (
                       <Chip
                         size="small"
-                        label={
-                          predictionConfidence
-                        }
+                        label={predictionConfidence}
                         sx={{
                           color: "#dbeafe",
-                          backgroundColor:
-                            "#1d4ed8",
+                          backgroundColor: "#1d4ed8",
                           fontWeight: 700,
                         }}
                       />
                     )}
-
                   </Stack>
 
                   <Typography
@@ -1183,21 +784,17 @@ function AIAnalysisPanel({
                       color: "#94a3b8",
                     }}
                   >
-                    This value is the model's study-level
-                    classification output. It is not a
+                    This value is the model's study-level classification output. It is not a
                     confirmed clinical diagnosis.
                   </Typography>
-
                 </Box>
               )}
-
 
               {/* ---------------------------------------------
                   FINDINGS
               ---------------------------------------------- */}
 
               <Box>
-
                 <Typography
                   sx={{
                     fontSize: 9,
@@ -1210,14 +807,11 @@ function AIAnalysisPanel({
                   AI FINDINGS
                 </Typography>
 
-
                 {resultFindings.length === 0 ? (
-
                   <Box
                     sx={{
                       p: 1.3,
-                      border:
-                        "1px dashed #334155",
+                      border: "1px dashed #334155",
                       borderRadius: 1.2,
                     }}
                   >
@@ -1230,224 +824,140 @@ function AIAnalysisPanel({
                       No AI findings were returned.
                     </Typography>
                   </Box>
-
                 ) : (
+                  <Stack spacing={0.8}>
+                    {resultFindings.map((finding, index) => {
+                      const confidence = formatConfidence(finding?.confidence);
 
-                  <Stack
-                    spacing={0.8}
-                  >
-
-                    {resultFindings.map(
-                      (
-                        finding,
-                        index
-                      ) => {
-
-                        const confidence =
-                          formatConfidence(
-                            finding?.confidence
-                          );
-
-                        return (
-                          <Paper
-                            key={
-                              finding?.id ||
-                              `finding-${index}`
-                            }
-                            elevation={0}
-                            sx={{
-                              p: 1.1,
-                              backgroundColor:
-                                "#18212b",
-                              border:
-                                "1px solid #334155",
-                              borderRadius: 1.2,
-                            }}
+                      return (
+                        <Paper
+                          key={finding?.id || `finding-${index}`}
+                          elevation={0}
+                          sx={{
+                            p: 1.1,
+                            backgroundColor: "#18212b",
+                            border: "1px solid #334155",
+                            borderRadius: 1.2,
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="flex-start"
+                            spacing={1}
                           >
-
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                              alignItems="flex-start"
-                              spacing={1}
+                            <Typography
+                              sx={{
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                color: "#e2e8f0",
+                              }}
                             >
+                              {finding?.label || "AI Finding"}
+                            </Typography>
 
-                              <Typography
+                            {confidence && (
+                              <Chip
+                                size="small"
+                                label={confidence}
                                 sx={{
-                                  fontSize: 10.5,
-                                  fontWeight: 700,
-                                  color:
-                                    "#e2e8f0",
+                                  height: 20,
+                                  color: "#dbeafe",
+                                  backgroundColor: "#1e3a5f",
+                                  fontSize: 9,
                                 }}
-                              >
-                                {
-                                  finding?.label ||
-                                  "AI Finding"
-                                }
-                              </Typography>
-
-                              {confidence && (
-                                <Chip
-                                  size="small"
-                                  label={
-                                    confidence
-                                  }
-                                  sx={{
-                                    height: 20,
-                                    color:
-                                      "#dbeafe",
-                                    backgroundColor:
-                                      "#1e3a5f",
-                                    fontSize: 9,
-                                  }}
-                                />
-                              )}
-
-                            </Stack>
-
-
-                            {finding?.description && (
-                              <Typography
-                                sx={{
-                                  mt: 0.65,
-                                  fontSize: 9.5,
-                                  lineHeight: 1.5,
-                                  color:
-                                    "#94a3b8",
-                                }}
-                              >
-                                {
-                                  finding.description
-                                }
-                              </Typography>
+                              />
                             )}
+                          </Stack>
 
-                          </Paper>
-                        );
-                      }
-                    )}
-
+                          {finding?.description && (
+                            <Typography
+                              sx={{
+                                mt: 0.65,
+                                fontSize: 9.5,
+                                lineHeight: 1.5,
+                                color: "#94a3b8",
+                              }}
+                            >
+                              {finding.description}
+                            </Typography>
+                          )}
+                        </Paper>
+                      );
+                    })}
                   </Stack>
                 )}
-
               </Box>
-
 
               {/* ---------------------------------------------
                   QUANTITATIVE RESULTS
               ---------------------------------------------- */}
 
-              {Array.isArray(
-                normalizedResult?.measurements
-              ) &&
-              normalizedResult.measurements.length >
-                0 && (
-
-                <Box
-                  sx={{
-                    mt: 1.5,
-                  }}
-                >
-
-                  <Typography
+              {Array.isArray(normalizedResult?.measurements) &&
+                normalizedResult.measurements.length > 0 && (
+                  <Box
                     sx={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "#64748b",
-                      letterSpacing: 0.6,
-                      mb: 0.8,
+                      mt: 1.5,
                     }}
                   >
-                    QUANTITATIVE RESULTS
-                  </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: "#64748b",
+                        letterSpacing: 0.6,
+                        mb: 0.8,
+                      }}
+                    >
+                      QUANTITATIVE RESULTS
+                    </Typography>
 
-                  <Stack
-                    spacing={0.65}
-                  >
-
-                    {normalizedResult.measurements.map(
-                      (
-                        measurement,
-                        index
-                      ) => (
-
+                    <Stack spacing={0.65}>
+                      {normalizedResult.measurements.map((measurement, index) => (
                         <Box
-                          key={
-                            `measurement-${index}`
-                          }
+                          key={`measurement-${index}`}
                           sx={{
                             p: 0.9,
-                            border:
-                              "1px solid #202832",
+                            border: "1px solid #202832",
                             borderRadius: 1,
-                            backgroundColor:
-                              "#0d131a",
+                            backgroundColor: "#0d131a",
                           }}
                         >
-
-                          <Stack
-                            direction="row"
-                            justifyContent="space-between"
-                            spacing={1}
-                          >
-
+                          <Stack direction="row" justifyContent="space-between" spacing={1}>
                             <Typography
                               sx={{
                                 fontSize: 9.5,
-                                color:
-                                  "#94a3b8",
+                                color: "#94a3b8",
                               }}
                             >
-                              {
-                                measurement?.label ||
-                                `Measurement ${
-                                  index + 1
-                                }`
-                              }
+                              {measurement?.label || `Measurement ${index + 1}`}
                             </Typography>
 
                             <Typography
                               sx={{
                                 fontSize: 9.5,
                                 fontWeight: 700,
-                                color:
-                                  "#dbeafe",
+                                color: "#dbeafe",
                               }}
                             >
-                              {
-                                measurement?.value ??
-                                "-"
-                              }{" "}
-                              {
-                                measurement?.unit ||
-                                ""
-                              }
+                              {measurement?.value ?? "-"} {measurement?.unit || ""}
                             </Typography>
-
                           </Stack>
-
                         </Box>
-                      )
-                    )}
-
-                  </Stack>
-                </Box>
-              )}
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
               {/* ---------------------------------------------
                   AI REPORT DRAFT
               ---------------------------------------------- */}
 
-              {(
-                report?.findings ||
-                report?.impression
-              ) && (
-
+              {(report?.findings || report?.impression) && (
                 <Box
                   sx={{
                     mt: 1.5,
                   }}
                 >
-
                   <Box
                     sx={{
                       display: "flex",
@@ -1457,7 +967,6 @@ function AIAnalysisPanel({
                       mb: 0.8,
                     }}
                   >
-
                     <Typography
                       sx={{
                         fontSize: 9,
@@ -1472,12 +981,8 @@ function AIAnalysisPanel({
                     <Button
                       size="small"
                       variant="outlined"
-                      startIcon={
-                        <EditIcon />
-                      }
-                      onClick={
-                        openReportEditor
-                      }
+                      startIcon={<EditIcon />}
+                      onClick={openReportEditor}
                       sx={{
                         minWidth: 0,
                         px: 1,
@@ -1490,37 +995,27 @@ function AIAnalysisPanel({
                     >
                       Edit
                     </Button>
-
                   </Box>
-
 
                   <Box
                     sx={{
                       p: 1.2,
-                      border:
-                        "1px solid #202832",
+                      border: "1px solid #202832",
                       borderRadius: 1.2,
-                      backgroundColor:
-                        "#0d131a",
+                      backgroundColor: "#0d131a",
                     }}
                   >
-
                     {report?.findings && (
                       <Box
                         sx={{
-                          mb:
-                            report?.impression
-                              ? 1
-                              : 0,
+                          mb: report?.impression ? 1 : 0,
                         }}
                       >
-
                         <Typography
                           sx={{
                             fontSize: 9,
                             fontWeight: 700,
-                            color:
-                              "#94a3b8",
+                            color: "#94a3b8",
                             mb: 0.4,
                           }}
                         >
@@ -1531,30 +1026,22 @@ function AIAnalysisPanel({
                           sx={{
                             fontSize: 9.5,
                             lineHeight: 1.55,
-                            color:
-                              "#cbd5e1",
-                            whiteSpace:
-                              "pre-wrap",
+                            color: "#cbd5e1",
+                            whiteSpace: "pre-wrap",
                           }}
                         >
-                          {
-                            report.findings
-                          }
+                          {report.findings}
                         </Typography>
-
                       </Box>
                     )}
 
-
                     {report?.impression && (
                       <Box>
-
                         <Typography
                           sx={{
                             fontSize: 9,
                             fontWeight: 700,
-                            color:
-                              "#94a3b8",
+                            color: "#94a3b8",
                             mb: 0.4,
                           }}
                         >
@@ -1565,25 +1052,17 @@ function AIAnalysisPanel({
                           sx={{
                             fontSize: 9.5,
                             lineHeight: 1.55,
-                            color:
-                              "#cbd5e1",
-                            whiteSpace:
-                              "pre-wrap",
+                            color: "#cbd5e1",
+                            whiteSpace: "pre-wrap",
                           }}
                         >
-                          {
-                            report.impression
-                          }
+                          {report.impression}
                         </Typography>
-
                       </Box>
                     )}
-
                   </Box>
-
                 </Box>
               )}
-
 
               {/* ---------------------------------------------
                   SAVE STATUS
@@ -1592,23 +1071,18 @@ function AIAnalysisPanel({
               {reportSaved && (
                 <Alert
                   severity="success"
-                  icon={
-                    <CheckCircleIcon />
-                  }
+                  icon={<CheckCircleIcon />}
                   sx={{
                     mt: 1.2,
-                    backgroundColor:
-                      "rgba(22,101,52,0.16)",
+                    backgroundColor: "rgba(22,101,52,0.16)",
                     color: "#bbf7d0",
-                    border:
-                      "1px solid rgba(74,222,128,0.22)",
+                    border: "1px solid rgba(74,222,128,0.22)",
                     fontSize: 10,
                   }}
                 >
                   {saveMessage}
                 </Alert>
               )}
-
 
               {/* ---------------------------------------------
                   MODEL / REVIEW WARNING
@@ -1618,14 +1092,11 @@ function AIAnalysisPanel({
                 sx={{
                   mt: 1.5,
                   p: 1.1,
-                  border:
-                    "1px solid rgba(245,158,11,0.22)",
+                  border: "1px solid rgba(245,158,11,0.22)",
                   borderRadius: 1.2,
-                  backgroundColor:
-                    "rgba(120,53,15,0.12)",
+                  backgroundColor: "rgba(120,53,15,0.12)",
                 }}
               >
-
                 <Box
                   sx={{
                     display: "flex",
@@ -1633,7 +1104,6 @@ function AIAnalysisPanel({
                     gap: 0.8,
                   }}
                 >
-
                   <WarningAmberIcon
                     sx={{
                       fontSize: 17,
@@ -1649,16 +1119,11 @@ function AIAnalysisPanel({
                       color: "#fcd34d",
                     }}
                   >
-                    AI output is assistive/research output.
-                    It requires qualified radiologist review
-                    and must not be treated as an autonomous
-                    diagnosis.
+                    AI output is assistive/research output. It requires qualified radiologist review
+                    and must not be treated as an autonomous diagnosis.
                   </Typography>
-
                 </Box>
-
               </Box>
-
 
               {/* ---------------------------------------------
                   ANALYSIS DETAILS
@@ -1670,7 +1135,6 @@ function AIAnalysisPanel({
                     mt: 1.4,
                   }}
                 >
-
                   <Typography
                     sx={{
                       fontSize: 9,
@@ -1686,29 +1150,17 @@ function AIAnalysisPanel({
                   <Box
                     sx={{
                       p: 1,
-                      border:
-                        "1px solid #202832",
+                      border: "1px solid #202832",
                       borderRadius: 1,
-                      backgroundColor:
-                        "#0d131a",
+                      backgroundColor: "#0d131a",
                     }}
                   >
-
-                    <Stack
-                      spacing={0.55}
-                    >
-
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        spacing={1}
-                      >
-
+                    <Stack spacing={0.55}>
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#64748b",
+                            color: "#64748b",
                           }}
                         >
                           Pipeline
@@ -1717,32 +1169,19 @@ function AIAnalysisPanel({
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#94a3b8",
-                            textAlign:
-                              "right",
+                            color: "#94a3b8",
+                            textAlign: "right",
                           }}
                         >
-                          {
-                            metadata?.pipeline ||
-                            "Radiology AI Copilot"
-                          }
+                          {metadata?.pipeline || "Radiology AI Copilot"}
                         </Typography>
-
                       </Stack>
 
-
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        spacing={1}
-                      >
-
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#64748b",
+                            color: "#64748b",
                           }}
                         >
                           Generated
@@ -1751,33 +1190,19 @@ function AIAnalysisPanel({
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#94a3b8",
-                            textAlign:
-                              "right",
+                            color: "#94a3b8",
+                            textAlign: "right",
                           }}
                         >
-                          {
-                            formatDateTime(
-                              generatedAt
-                            )
-                          }
+                          {formatDateTime(generatedAt)}
                         </Typography>
-
                       </Stack>
 
-
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        spacing={1}
-                      >
-
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#64748b",
+                            color: "#64748b",
                           }}
                         >
                           Clinical review
@@ -1786,28 +1211,20 @@ function AIAnalysisPanel({
                         <Typography
                           sx={{
                             fontSize: 9,
-                            color:
-                              "#fbbf24",
+                            color: "#fbbf24",
                             fontWeight: 700,
                           }}
                         >
                           Required
                         </Typography>
-
                       </Stack>
-
                     </Stack>
-
                   </Box>
-
                 </Box>
               )}
-
             </Box>
           )}
-
         </Box>
-
 
         {/* ===================================================
             FOOTER
@@ -1816,13 +1233,10 @@ function AIAnalysisPanel({
         <Box
           sx={{
             p: 1,
-            borderTop:
-              "1px solid #263241",
-            backgroundColor:
-              "#0d141c",
+            borderTop: "1px solid #263241",
+            backgroundColor: "#0d141c",
           }}
         >
-
           <Typography
             variant="caption"
             sx={{
@@ -1834,36 +1248,26 @@ function AIAnalysisPanel({
           >
             AI assistance • Radiologist review required
           </Typography>
-
         </Box>
-
       </Paper>
-
 
       {/* =====================================================
           REPORT EDITOR DIALOG
       ====================================================== */}
 
       <Dialog
-        open={
-          editDialogOpen
-        }
-        onClose={
-          closeReportEditor
-        }
+        open={editDialogOpen}
+        onClose={closeReportEditor}
         fullWidth
         maxWidth="md"
         PaperProps={{
           sx: {
-            backgroundColor:
-              "#111820",
+            backgroundColor: "#111820",
             color: "#ffffff",
-            border:
-              "1px solid #263241",
+            border: "1px solid #263241",
           },
         }}
       >
-
         <DialogTitle
           sx={{
             display: "flex",
@@ -1872,45 +1276,33 @@ function AIAnalysisPanel({
             color: "#e2e8f0",
           }}
         >
-
           <ArticleIcon
             sx={{
               color: "#64b5f6",
             }}
           />
-
           Edit AI Report Draft
-
         </DialogTitle>
-
 
         <DialogContent
           dividers
           sx={{
-            borderColor:
-              "#263241",
+            borderColor: "#263241",
           }}
         >
-
           <Alert
             severity="warning"
-            icon={
-              <WarningAmberIcon />
-            }
+            icon={<WarningAmberIcon />}
             sx={{
               mb: 2,
-              backgroundColor:
-                "rgba(120,53,15,0.14)",
+              backgroundColor: "rgba(120,53,15,0.14)",
               color: "#fde68a",
-              border:
-                "1px solid rgba(245,158,11,0.22)",
+              border: "1px solid rgba(245,158,11,0.22)",
             }}
           >
-            Review and edit the AI-generated content before
-            saving. Saving a report does not make the AI
-            output a confirmed diagnosis.
+            Review and edit the AI-generated content before saving. Saving a report does not make
+            the AI output a confirmed diagnosis.
           </Alert>
-
 
           {saveError && (
             <Alert
@@ -1923,22 +1315,12 @@ function AIAnalysisPanel({
             </Alert>
           )}
 
-
-          <Stack
-            spacing={2}
-          >
-
+          <Stack spacing={2}>
             <TextField
               label="Radiologist Name"
               fullWidth
-              value={
-                radiologistName
-              }
-              onChange={(event) =>
-                setRadiologistName(
-                  event.target.value
-                )
-              }
+              value={radiologistName}
+              onChange={(event) => setRadiologistName(event.target.value)}
               InputLabelProps={{
                 sx: {
                   color: "#94a3b8",
@@ -1950,33 +1332,22 @@ function AIAnalysisPanel({
                 },
               }}
               sx={{
-                "& .MuiOutlinedInput-notchedOutline":
-                  {
-                    borderColor:
-                      "#334155",
-                  },
-                "&:hover .MuiOutlinedInput-notchedOutline":
-                  {
-                    borderColor:
-                      "#475569",
-                  },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#334155",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#475569",
+                },
               }}
             />
-
 
             <TextField
               label="Findings"
               fullWidth
               multiline
               minRows={7}
-              value={
-                reportFindings
-              }
-              onChange={(event) =>
-                setReportFindings(
-                  event.target.value
-                )
-              }
+              value={reportFindings}
+              onChange={(event) => setReportFindings(event.target.value)}
               InputLabelProps={{
                 sx: {
                   color: "#94a3b8",
@@ -1985,33 +1356,23 @@ function AIAnalysisPanel({
               InputProps={{
                 sx: {
                   color: "#ffffff",
-                  alignItems:
-                    "flex-start",
+                  alignItems: "flex-start",
                 },
               }}
               sx={{
-                "& .MuiOutlinedInput-notchedOutline":
-                  {
-                    borderColor:
-                      "#334155",
-                  },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#334155",
+                },
               }}
             />
-
 
             <TextField
               label="Impression"
               fullWidth
               multiline
               minRows={5}
-              value={
-                reportImpression
-              }
-              onChange={(event) =>
-                setReportImpression(
-                  event.target.value
-                )
-              }
+              value={reportImpression}
+              onChange={(event) => setReportImpression(event.target.value)}
               InputLabelProps={{
                 sx: {
                   color: "#94a3b8",
@@ -2020,117 +1381,65 @@ function AIAnalysisPanel({
               InputProps={{
                 sx: {
                   color: "#ffffff",
-                  alignItems:
-                    "flex-start",
+                  alignItems: "flex-start",
                 },
               }}
               sx={{
-                "& .MuiOutlinedInput-notchedOutline":
-                  {
-                    borderColor:
-                      "#334155",
-                  },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#334155",
+                },
               }}
             />
-
           </Stack>
-
         </DialogContent>
-
 
         <DialogActions
           sx={{
             p: 1.5,
-            borderTop:
-              "1px solid #263241",
+            borderTop: "1px solid #263241",
             gap: 1,
-            flexWrap:
-              "wrap",
+            flexWrap: "wrap",
           }}
         >
-
           <Button
-            onClick={
-              closeReportEditor
-            }
-            disabled={
-              savingReport
-            }
+            onClick={closeReportEditor}
+            disabled={savingReport}
             sx={{
-              color:
-                "#94a3b8",
-              textTransform:
-                "none",
+              color: "#94a3b8",
+              textTransform: "none",
             }}
           >
             Cancel
           </Button>
 
-
           <Button
             variant="outlined"
-            startIcon={
-              <SaveIcon />
-            }
-            onClick={() =>
-              handleSaveReport(
-                "Draft"
-              )
-            }
-            disabled={
-              savingReport
-            }
+            startIcon={<SaveIcon />}
+            onClick={() => handleSaveReport("Draft")}
+            disabled={savingReport}
             sx={{
-              textTransform:
-                "none",
-              color:
-                "#bfdbfe",
-              borderColor:
-                "#355276",
+              textTransform: "none",
+              color: "#bfdbfe",
+              borderColor: "#355276",
             }}
           >
-            {
-              savingReport &&
-              saveMode ===
-                "Draft"
-                ? "Saving..."
-                : "Save Draft"
-            }
+            {savingReport && saveMode === "Draft" ? "Saving..." : "Save Draft"}
           </Button>
-
 
           <Button
             variant="contained"
-            startIcon={
-              <DoneAllIcon />
-            }
-            onClick={() =>
-              handleSaveReport(
-                "Completed"
-              )
-            }
-            disabled={
-              savingReport
-            }
+            startIcon={<DoneAllIcon />}
+            onClick={() => handleSaveReport("Completed")}
+            disabled={savingReport}
             sx={{
-              textTransform:
-                "none",
+              textTransform: "none",
               fontWeight: 700,
             }}
           >
-            {
-              savingReport &&
-              saveMode ===
-                "Completed"
-                ? "Finalizing..."
-                : "Finalize Report"
-            }
+            {savingReport && saveMode === "Completed" ? "Finalizing..." : "Finalize Report"}
           </Button>
-
         </DialogActions>
-
       </Dialog>
-
     </>
   );
 }

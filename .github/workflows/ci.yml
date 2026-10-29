@@ -45,6 +45,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run format:check
       - run: npm test -- --watchAll=false
       - run: npm run build
 
