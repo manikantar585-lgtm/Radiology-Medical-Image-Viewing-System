@@ -488,6 +488,10 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
+            // overflowY alone makes the x-axis scrollable too; long unbroken
+            // text (file names, measurements) then shifts the panel sideways.
+            overflowX: "hidden",
+            "& .MuiTypography-root": { overflowWrap: "anywhere" },
           }}
         >
           {/* =================================================
