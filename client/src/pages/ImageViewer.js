@@ -37,7 +37,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
-const API_URL = "http://localhost:5000";
+import { API_URL, authHeaders, getStoredUser, jsonHeaders } from "../api/http";
 
 const DEFAULT_HOTKEYS = {
   zoomIn: "+",
@@ -52,38 +52,12 @@ const DEFAULT_HOTKEYS = {
   cancel: "Escape",
 };
 
-function getLoggedInUser() {
-  try {
-    const raw = localStorage.getItem("loggedInUser");
-
-    if (!raw) {
-      return null;
-    }
-
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error("Unable to read logged in user:", error);
-    return null;
-  }
-}
-
 function getUserId() {
-  const user = getLoggedInUser();
-  return user?.id || null;
+  return getStoredUser()?.id || null;
 }
 
-function getJsonHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "x-user-id": String(getUserId() || ""),
-  };
-}
-
-function getImageHeaders() {
-  return {
-    "x-user-id": String(getUserId() || ""),
-  };
-}
+const getJsonHeaders = jsonHeaders;
+const getImageHeaders = authHeaders;
 
 function normalizeHotkey(value) {
   const normalized = String(value || "")
@@ -726,8 +700,7 @@ function ImageViewer() {
               {
                 method: "POST",
                 headers: {
-                  "x-user-id":
-                    String(userId),
+                  ...authHeaders(),
                 },
                 body: formData,
               }
@@ -902,8 +875,7 @@ function ImageViewer() {
             {
               method: "DELETE",
               headers: {
-                "x-user-id":
-                  String(userId),
+                ...authHeaders(),
               },
             }
           );
@@ -1016,8 +988,7 @@ function ImageViewer() {
               headers: {
                 "Content-Type":
                   "application/json",
-                "x-user-id":
-                  String(userId),
+                ...authHeaders(),
               },
               body: JSON.stringify({
                 patientId:

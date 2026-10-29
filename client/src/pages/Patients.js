@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import { API_URL, jsonHeaders } from "../api/http";
 
 import {
   Box,
@@ -44,7 +45,6 @@ function Patients() {
     phone: "",
   });
   const [loading, setLoading] = useState(false);
-  const API_URL = "http://localhost:5000";
   const getLoggedInUser = React.useCallback(() => {
     try {
       const storedUser =
@@ -68,13 +68,7 @@ function Patients() {
     }
     return user.id;
   }, [getLoggedInUser]);
-  const getUserHeaders = React.useCallback(() => {
-    const userId = getUserId();
-    return {
-      "Content-Type": "application/json",
-      "x-user-id": String(userId),
-    };
-  }, [getUserId]);
+  const getUserHeaders = jsonHeaders;
   const fetchPatients = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -116,7 +110,7 @@ function Patients() {
     } finally {
       setLoading(false);
     }
-  }, [API_URL, getUserHeaders, getUserId, navigate]);
+  }, [getUserHeaders, getUserId, navigate]);
   useEffect(() => {
     const userId = getUserId();
     if (!userId) {

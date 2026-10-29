@@ -31,36 +31,14 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ArticleIcon from "@mui/icons-material/Article";
 
 
-const API_URL = "http://localhost:5000";
+import { API_URL, getStoredUser, jsonHeaders } from "../api/http";
 
 
 // =========================================================
 // USER HELPERS
 // =========================================================
 
-function getLoggedInUser() {
-  try {
-    const storedUser =
-      localStorage.getItem(
-        "loggedInUser"
-      );
-
-    if (!storedUser) {
-      return null;
-    }
-
-    return JSON.parse(
-      storedUser
-    );
-  } catch (error) {
-    console.error(
-      "Unable to read logged-in user:",
-      error
-    );
-
-    return null;
-  }
-}
+const getLoggedInUser = getStoredUser;
 
 
 function getUserId() {
@@ -520,15 +498,8 @@ function AIAnalysisPanel({
             {
               method,
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-
-                "x-user-id":
-                  String(
-                    userId
-                  ),
-              },
+              headers:
+                jsonHeaders(),
 
               body:
                 JSON.stringify(

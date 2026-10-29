@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_URL, saveSession } from "../api/http";
 function Login() {
   const navigate =
     useNavigate();
@@ -48,7 +49,7 @@ function Login() {
     try {
       const response =
         await fetch(
-          "http://localhost:5000/api/login",
+          `${API_URL}/api/login`,
           {
             method: "POST",
             headers: {
@@ -72,27 +73,13 @@ function Login() {
         );
         return;
       }
-      if (!data.user) {
+      if (!data.user || !data.token) {
         alert(
-          "Login succeeded, but user information was not received."
+          "Login succeeded, but the session was not received."
         );
         return;
       }
-      localStorage.removeItem(
-        "user"
-      );
-      localStorage.removeItem(
-        "fullName"
-      );
-      localStorage.removeItem(
-        "userName"
-      );
-      localStorage.setItem(
-        "loggedInUser",
-        JSON.stringify(
-          data.user
-        )
-      );
+      saveSession(data);
       alert(
         "Login Successful"
       );

@@ -5,6 +5,7 @@ import {
 } from "react";
 
 import Layout from "../components/Layout";
+import { API_URL, authHeaders, jsonHeaders } from "../api/http";
 
 import {
   Box,
@@ -42,8 +43,6 @@ import ImageIcon from "@mui/icons-material/Image";
 
 
 function Reports() {
-  const API_URL =
-    "http://localhost:5000";
 
 
   // =========================================================
@@ -146,25 +145,7 @@ function Reports() {
     ]);
 
 
-  const getUserHeaders =
-    useCallback(() => {
-
-      const userId =
-        getUserId();
-
-      return {
-        "Content-Type":
-          "application/json",
-
-        "x-user-id":
-          String(
-            userId || ""
-          ),
-      };
-
-    }, [
-      getUserId,
-    ]);
+  const getUserHeaders = jsonHeaders;
 
 
   // =========================================================
@@ -518,10 +499,7 @@ function Reports() {
                 "GET",
 
               headers: {
-                "x-user-id":
-                  String(
-                    userId
-                  ),
+                ...authHeaders(),
               },
             }
           );
@@ -598,10 +576,7 @@ function Reports() {
                 "GET",
 
               headers: {
-                "x-user-id":
-                  String(
-                    userId
-                  ),
+                ...authHeaders(),
               },
             }
           );
@@ -1136,10 +1111,7 @@ function Reports() {
                 "DELETE",
 
               headers: {
-                "x-user-id":
-                  String(
-                    userId
-                  ),
+                ...authHeaders(),
               },
             }
           );

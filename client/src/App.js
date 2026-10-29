@@ -24,6 +24,7 @@ import Patients from "./pages/Patients";
 import ImageViewer from "./pages/ImageViewer";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import { isAuthenticated } from "./api/http";
 
 const themeConfigs = {
   "ohif-blue": {
@@ -87,16 +88,12 @@ const getSavedTheme = () => {
   ) {
     return savedTheme;
   }
-  return "OHIF-blue";
+  return "ohif-blue";
 };
 function ProtectedRoute({
   children,
 }) {
-  const loggedInUser =
-    localStorage.getItem(
-      "loggedInUser"
-    );
-  if (!loggedInUser) {
+  if (!isAuthenticated()) {
    return (
       <Navigate
         to="/"

@@ -21,6 +21,8 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { clearSession } from "../api/http";
+
 const drawerWidth = 250;
 function Sidebar() {
   const location =
@@ -33,9 +35,7 @@ function Sidebar() {
         "Are you sure you want to logout?"
       );
     if (confirmLogout) {
-      localStorage.removeItem(
-        "loggedInUser"
-      );
+      clearSession();
       navigate("/");
 
     }

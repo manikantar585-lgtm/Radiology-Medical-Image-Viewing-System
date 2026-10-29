@@ -40,13 +40,14 @@ import StraightenIcon from "@mui/icons-material/Straighten";
 import TuneIcon from "@mui/icons-material/Tune";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 
+import { API_URL, authHeaders } from "../api/http";
+
 /* =========================================================
    CORNERSTONE3D VIEWPORT (OHIF-style)
    DICOM renders from the original pixel data (real HU and
    window/level); JPG/PNG uploads load through a web loader.
 ========================================================= */
 
-const API_URL = "http://localhost:5000";
 
 const COLORS = {
   background: "#000000",
@@ -83,15 +84,6 @@ const TOOLS = [
 const toolName = (id) =>
   TOOLS.find((item) => item.id === id).tool.toolName;
 
-function getUserId() {
-  try {
-    const user = JSON.parse(localStorage.getItem("loggedInUser") || "null");
-    return user?.id ? String(user.id) : "";
-  } catch (error) {
-    return "";
-  }
-}
-
 export function isDicomImage(image) {
   const name = String(image?.fileName || "").toLowerCase();
   const type = String(image?.contentType || "").toLowerCase();
@@ -120,7 +112,7 @@ function loadWebImage(imageId) {
 
   const promise = (async () => {
     const response = await fetch(url, {
-      headers: { "x-user-id": getUserId() },
+      headers: authHeaders(),
     });
 
     if (!response.ok) {
@@ -231,7 +223,7 @@ function initCornerstone() {
 
       initDicomImageLoader({
         maxWebWorkers: Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)),
-        beforeSend: () => ({ "x-user-id": getUserId() }),
+        beforeSend: () => authHeaders(),
       });
 
       csCore.imageLoader.registerImageLoader("webimg", loadWebImage);

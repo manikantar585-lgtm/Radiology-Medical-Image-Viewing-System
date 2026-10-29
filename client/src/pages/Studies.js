@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 
 import Layout from "../components/Layout";
+import { API_URL, jsonHeaders } from "../api/http";
 
 import {
   Box,
@@ -75,14 +76,7 @@ const getUserId = () => {
   return user.id;
 };
 
-const getUserHeaders = () => {
-  const userId = getUserId();
-
-  return {
-    "Content-Type": "application/json",
-    "x-user-id": String(userId),
-  };
-};
+const getUserHeaders = jsonHeaders;
 
 function Studies() {
   const location = useLocation();
@@ -91,8 +85,6 @@ function Studies() {
   const patientFromPatientsPage =
     location.state?.patient || null;
 
-  const API_URL =
-    "http://localhost:5000";
 
   const [studies, setStudies] =
     useState([]);

@@ -7,6 +7,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import { API_URL, jsonHeaders } from "../api/http";
 
 import {
   Box,
@@ -44,8 +45,6 @@ function Dashboard() {
     useNavigate();
   const theme =
     useTheme();
-  const API_URL =
-    "http://localhost:5000";
   const [patients, setPatients] =
     useState([]);
   const [studies, setStudies] =
@@ -84,19 +83,7 @@ function Dashboard() {
     }, [
       getLoggedInUser,
     ]);
-  const getUserHeaders =
-    useCallback(() => {
-      const userId =
-        getUserId();
-      return {
-        "Content-Type":
-          "application/json",
-        "x-user-id":
-          String(userId),
-      };
-    }, [
-      getUserId,
-    ]);
+  const getUserHeaders = jsonHeaders;
   const loggedInUser =
     getLoggedInUser();
   const userName =
@@ -204,7 +191,6 @@ function Dashboard() {
         setLoading(false);
       }
     }, [
-      API_URL,
       getUserHeaders,
       getUserId,
       navigate,
