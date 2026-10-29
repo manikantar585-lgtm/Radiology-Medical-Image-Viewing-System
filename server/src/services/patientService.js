@@ -1,7 +1,8 @@
 const { sql, query, inserted } = require("../db/pool");
 const { notFound } = require("../utils/http");
 
-const COLUMNS = "Id AS id, Name AS name, Age AS age, Gender AS gender, Phone AS phone, CreatedAt AS createdAt";
+const COLUMNS =
+  "Id AS id, Name AS name, Age AS age, Gender AS gender, Phone AS phone, CreatedAt AS createdAt";
 const INSERTED_COLUMNS = inserted(COLUMNS);
 
 const patientParams = ({ name, age, gender, phone }) => ({

@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "mssql": "^12.7.0"
-  }
-}

@@ -3,8 +3,30 @@ const config = require("../config/env");
 
 let pool = null;
 
+/**
+ * Creates the configured database when it does not exist yet. Opt-in via
+ * DB_CREATE_IF_MISSING because it needs CREATE DATABASE permission on master,
+ * which is typical for a local or containerised SQL Server but not production.
+ */
+async function ensureDatabaseExists() {
+  const master = await new sql.ConnectionPool({ ...config.db, database: "master" }).connect();
+  try {
+    await master
+      .request()
+      .input("name", sql.NVarChar(128), config.db.database)
+      .query(
+        "IF DB_ID(@name) IS NULL BEGIN DECLARE @sql NVARCHAR(300) = N'CREATE DATABASE ' + QUOTENAME(@name); EXEC (@sql); END"
+      );
+  } finally {
+    await master.close();
+  }
+}
+
 async function connect() {
   if (!pool) {
+    if (config.db.createIfMissing) {
+      await ensureDatabaseExists();
+    }
     pool = await new sql.ConnectionPool(config.db).connect();
   }
   return pool;

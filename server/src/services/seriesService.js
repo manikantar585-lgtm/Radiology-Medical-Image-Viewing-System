@@ -63,7 +63,13 @@ async function nextSeriesNumber(userId, patientId, studyId, executor) {
   return Number(recordset[0].nextSeriesNumber);
 }
 
-async function insertSeries(userId, patientId, studyId, { seriesNumber, description, modality }, executor) {
+async function insertSeries(
+  userId,
+  patientId,
+  studyId,
+  { seriesNumber, description, modality },
+  executor
+) {
   const { recordset } = await query(
     `INSERT INTO dbo.Series (UserId, PatientId, StudyId, SeriesNumber, SeriesDescription, Modality)
      OUTPUT ${inserted(COLUMNS)}

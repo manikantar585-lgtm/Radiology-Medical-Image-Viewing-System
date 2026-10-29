@@ -1,5 +1,5 @@
 {
-  "name": "client",
+  "name": "radiology-client",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -20,14 +20,13 @@
     "react-icons": "^5.7.0",
     "react-router-dom": "^7.18.2",
     "react-scripts": "5.0.1",
-    "recharts": "^3.10.1",
-    "web-vitals": "^2.1.4"
+    "recharts": "^3.10.1"
   },
   "scripts": {
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "eject": "react-scripts eject"
+    "lint": "eslint --max-warnings=0 src"
   },
   "eslintConfig": {
     "extends": [

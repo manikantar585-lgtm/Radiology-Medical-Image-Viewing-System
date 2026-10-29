@@ -41,7 +41,9 @@ function errorHandler(error, req, res, _next) {
   // Internal error details are only exposed outside production.
   return res.status(500).json({
     success: false,
-    message: config.isProduction ? "Internal server error" : error.message || "Internal server error",
+    message: config.isProduction
+      ? "Internal server error"
+      : error.message || "Internal server error",
   });
 }
 

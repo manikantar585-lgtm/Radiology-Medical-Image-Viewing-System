@@ -1,0 +1,18 @@
+# Pinned to the versions the service is tested with.
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.5
+numpy==2.5.3
+pillow==12.3.0
+python-multipart==0.0.32
+pydicom==3.0.2
+pylibjpeg==2.1.0
+pylibjpeg-libjpeg==2.5.0
+pylibjpeg-openjpeg==2.6.0
+torch==2.14.0
+torchvision==0.29.0
+transformers==4.50.0
+TotalSegmentator==2.18.0
+nibabel==5.4.2
+open_clip_torch==3.3.0
+torchxrayvision==1.5.7

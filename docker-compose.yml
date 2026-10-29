@@ -1,0 +1,64 @@
+# Local full-stack environment: SQL Server, API, AI service and web client.
+#
+#   cp .env.example .env    # set SA_PASSWORD and JWT_SECRET
+#   docker compose up --build
+#
+# Then open http://localhost:3000
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:?Set SA_PASSWORD in .env}
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  ai-service:
+    build: ./ai-service
+    volumes:
+      # Downloaded model weights survive container rebuilds.
+      - model-cache:/home/appuser/.cache
+
+  api:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      CORS_ORIGINS: http://localhost:3000
+      DB_SERVER: db
+      DB_USER: sa
+      DB_PASSWORD: ${SA_PASSWORD}
+      DB_NAME: RadiologyDB
+      DB_CREATE_IF_MISSING: "true"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      AI_SERVICE_URL: http://ai-service:8001
+    ports:
+      - "5000:5000"
+
+  web:
+    build:
+      context: ./client
+      args:
+        REACT_APP_API_URL: http://localhost:5000
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+volumes:
+  mssql-data:
+  model-cache:

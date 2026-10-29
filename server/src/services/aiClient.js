@@ -39,7 +39,9 @@ async function renderDicom(buffer) {
     }
     return Buffer.from(data.dataBase64, "base64");
   } catch (error) {
-    throw error instanceof HttpError ? error : toHttpError(error, "Unable to render DICOM preview.");
+    throw error instanceof HttpError
+      ? error
+      : toHttpError(error, "Unable to render DICOM preview.");
   }
 }
 

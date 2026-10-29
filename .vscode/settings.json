@@ -87,7 +87,7 @@
     ],
     "python-envs.pythonProjects": [
         {
-            "path": "public",
+            "path": "ai-service",
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }
