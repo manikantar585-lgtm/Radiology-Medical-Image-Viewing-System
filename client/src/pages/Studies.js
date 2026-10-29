@@ -565,19 +565,21 @@ function Studies() {
   return (
     <Layout>
       <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        gap={2}
-        mb={3}
-        flexWrap="wrap"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 2,
+          mb: 3,
+          flexWrap: "wrap",
+        }}
       >
         <Box>
-          <Typography variant="h4" fontWeight="bold">
+          <Typography sx={{ fontWeight: "bold" }} variant="h4">
             {pageTitle}
           </Typography>
 
-          <Typography color="text.secondary" mt={1}>
+          <Typography sx={{ color: "text.secondary", mt: 1 }}>
             {patientFromPatientsPage
               ? "Manage medical studies for this patient"
               : "View and manage all medical studies"}
@@ -728,7 +730,7 @@ function Studies() {
                       py: 6,
                     }}
                   >
-                    <Typography color="text.secondary">No studies found.</Typography>
+                    <Typography sx={{ color: "text.secondary" }}>No studies found.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -740,17 +742,17 @@ function Studies() {
                   return (
                     <TableRow key={study.id} hover>
                       <TableCell>
-                        <Typography fontWeight="bold">
+                        <Typography sx={{ fontWeight: "bold" }}>
                           {study.patientName || patient?.name || "-"}
                         </Typography>
 
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography sx={{ color: "text.secondary" }} variant="caption">
                           ID: {study.patientId}
                         </Typography>
                       </TableCell>
 
                       <TableCell>
-                        <Typography fontWeight="bold">{study.studyId || "-"}</Typography>
+                        <Typography sx={{ fontWeight: "bold" }}>{study.studyId || "-"}</Typography>
                       </TableCell>
 
                       <TableCell>{study.modality || "-"}</TableCell>
@@ -765,9 +767,8 @@ function Studies() {
 
                       <TableCell align="center">
                         <Stack
+                          sx={{ justifyContent: "center", alignItems: "center" }}
                           direction="row"
-                          justifyContent="center"
-                          alignItems="center"
                           spacing={0.5}
                         >
                           <ImageIcon
@@ -775,12 +776,18 @@ function Studies() {
                             color={Number(study.imageCount || 0) > 0 ? "primary" : "disabled"}
                           />
 
-                          <Typography fontWeight="bold">{Number(study.imageCount || 0)}</Typography>
+                          <Typography sx={{ fontWeight: "bold" }}>
+                            {Number(study.imageCount || 0)}
+                          </Typography>
                         </Stack>
                       </TableCell>
 
                       <TableCell align="center">
-                        <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                        <Stack
+                          sx={{ justifyContent: "center", flexWrap: "wrap" }}
+                          direction="row"
+                          spacing={1}
+                        >
                           {report ? (
                             <Button
                               variant="outlined"
@@ -973,11 +980,11 @@ function Studies() {
                     borderRadius: 2,
                   }}
                 >
-                  <Typography variant="subtitle2" color="text.secondary">
+                  <Typography sx={{ color: "text.secondary" }} variant="subtitle2">
                     Patient
                   </Typography>
 
-                  <Typography fontWeight="bold" mb={2}>
+                  <Typography sx={{ fontWeight: "bold", mb: 2 }}>
                     {selectedStudy?.patientName || selectedPatient?.name || "-"}
                   </Typography>
 
@@ -987,13 +994,15 @@ function Studies() {
                     }}
                   />
 
-                  <Typography variant="subtitle2" color="text.secondary">
+                  <Typography sx={{ color: "text.secondary" }} variant="subtitle2">
                     Study ID
                   </Typography>
 
-                  <Typography fontWeight="bold">{selectedStudy?.studyId || "-"}</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>
+                    {selectedStudy?.studyId || "-"}
+                  </Typography>
 
-                  <Typography variant="body2" color="text.secondary" mt={1}>
+                  <Typography sx={{ color: "text.secondary", mt: 1 }} variant="body2">
                     {selectedStudy?.modality || "-"}
                     {" • "}
                     {selectedStudy?.bodyPart || "-"}
@@ -1044,8 +1053,8 @@ function Studies() {
                     borderRadius: 2,
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Typography variant="body2" color="text.secondary">
+                  <Stack sx={{ alignItems: "center" }} direction="row" spacing={1}>
+                    <Typography sx={{ color: "text.secondary" }} variant="body2">
                       Report Status:
                     </Typography>
 

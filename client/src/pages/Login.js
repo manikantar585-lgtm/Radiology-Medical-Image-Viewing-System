@@ -211,7 +211,7 @@ function Login() {
                 <Security fontSize="small" />
               </Box>
               <Box>
-                <Typography fontWeight="bold">Secure Access</Typography>
+                <Typography sx={{ fontWeight: "bold" }}>Secure Access</Typography>
                 <Typography
                   variant="body2"
                   sx={{
@@ -243,7 +243,7 @@ function Login() {
                 <ImageSearch fontSize="small" />
               </Box>
               <Box>
-                <Typography fontWeight="bold">Medical Image Viewer</Typography>
+                <Typography sx={{ fontWeight: "bold" }}>Medical Image Viewer</Typography>
                 <Typography
                   variant="body2"
                   sx={{
@@ -313,21 +313,10 @@ function Login() {
               mb: 3.5,
             }}
           >
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-              sx={{
-                letterSpacing: -0.5,
-              }}
-            >
+            <Typography variant="h4" sx={{ fontWeight: "bold", letterSpacing: -0.5 }}>
               Welcome to Radiology Workspace
             </Typography>
-            <Typography
-              color="text.secondary"
-              sx={{
-                mt: 0.8,
-              }}
-            >
+            <Typography sx={{ color: "text.secondary", mt: 0.8 }}>
               Sign in to access your radiology workspace.
             </Typography>
           </Box>
@@ -396,8 +385,8 @@ function Login() {
             />
             <Typography
               variant="body2"
-              color="primary"
               sx={{
+                color: "primary",
                 cursor: "pointer",
                 fontWeight: 500,
                 "&:hover": {
@@ -442,7 +431,7 @@ function Login() {
                 flex: 1,
               }}
             />
-            <Typography variant="caption" color="text.secondary">
+            <Typography sx={{ color: "text.secondary" }} variant="caption">
               OR
             </Typography>
             <Divider
@@ -451,7 +440,7 @@ function Login() {
               }}
             />
           </Box>
-          <Typography align="center" variant="body2" color="text.secondary">
+          <Typography sx={{ color: "text.secondary" }} align="center" variant="body2">
             Don't have an account?{" "}
             <Box
               component={Link}
@@ -481,7 +470,7 @@ function Login() {
             }}
           >
             <Security fontSize="small" color="action" />
-            <Typography variant="caption" color="text.secondary" lineHeight={1.5}>
+            <Typography sx={{ color: "text.secondary", lineHeight: 1.5 }} variant="caption">
               Authorized users only. This system is intended for radiology information and medical
               image management.
             </Typography>

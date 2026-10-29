@@ -87,7 +87,7 @@ function Navbar() {
             {getInitials(userName)}
           </Avatar>
           <Box>
-            <Typography variant="body2" fontWeight="bold">
+            <Typography sx={{ fontWeight: "bold" }} variant="body2">
               {userName}
             </Typography>
             <Typography variant="caption">{department}</Typography>

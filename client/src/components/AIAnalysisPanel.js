@@ -372,7 +372,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                 }}
               />
 
-              <Typography variant="subtitle1" fontWeight="bold">
+              <Typography sx={{ fontWeight: "bold" }} variant="subtitle1">
                 AI Copilot
               </Typography>
             </Box>
@@ -433,14 +433,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
             CURRENT STUDY
           </Typography>
 
-          <Typography
-            variant="body2"
-            fontWeight="bold"
-            sx={{
-              mt: 0.5,
-              color: "#e2e8f0",
-            }}
-          >
+          <Typography variant="body2" sx={{ fontWeight: "bold", mt: 0.5, color: "#e2e8f0" }}>
             {study?.studyId || study?.id || "Unknown Study"}
           </Typography>
 
@@ -659,7 +652,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                 </Typography>
 
                 <Stack spacing={0.55}>
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                  <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -681,7 +674,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                     </Typography>
                   </Stack>
 
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                  <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -702,7 +695,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                     </Typography>
                   </Stack>
 
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
+                  <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                     <Typography
                       sx={{
                         fontSize: 9.5,
@@ -752,9 +745,8 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                   </Typography>
 
                   <Stack
+                    sx={{ justifyContent: "space-between", alignItems: "center" }}
                     direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
                     spacing={1}
                   >
                     <Typography
@@ -845,9 +837,8 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                           }}
                         >
                           <Stack
+                            sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
                             direction="row"
-                            justifyContent="space-between"
-                            alignItems="flex-start"
                             spacing={1}
                           >
                             <Typography
@@ -927,7 +918,11 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                             backgroundColor: "#0d131a",
                           }}
                         >
-                          <Stack direction="row" justifyContent="space-between" spacing={1}>
+                          <Stack
+                            sx={{ justifyContent: "space-between" }}
+                            direction="row"
+                            spacing={1}
+                          >
                             <Typography
                               sx={{
                                 fontSize: 9.5,
@@ -1160,7 +1155,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                     }}
                   >
                     <Stack spacing={0.55}>
-                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                      <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,
@@ -1181,7 +1176,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                         </Typography>
                       </Stack>
 
-                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                      <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,
@@ -1202,7 +1197,7 @@ function AIAnalysisPanel({ study, analysisStatus, findings = [], aiResult = null
                         </Typography>
                       </Stack>
 
-                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                      <Stack sx={{ justifyContent: "space-between" }} direction="row" spacing={1}>
                         <Typography
                           sx={{
                             fontSize: 9,

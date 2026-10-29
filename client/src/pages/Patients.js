@@ -216,12 +216,12 @@ function Patients() {
   return (
     <Layout>
       <Box sx={{ width: "100%" }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Box>
-            <Typography variant="h4" fontWeight="bold">
+            <Typography sx={{ fontWeight: "bold" }} variant="h4">
               Patient Management
             </Typography>
-            <Typography color="text.secondary" mt={1}>
+            <Typography sx={{ color: "text.secondary", mt: 1 }}>
               Manage patient records and information
             </Typography>
           </Box>
@@ -239,8 +239,8 @@ function Patients() {
             boxSizing: "border-box",
           }}
         >
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+          <Grid sx={{ alignItems: "center" }} container spacing={2}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -256,7 +256,7 @@ function Patients() {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 select
                 fullWidth
@@ -277,7 +277,7 @@ function Patients() {
                 <MenuItem value="Other">Other</MenuItem>
               </TextField>
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Button
                 fullWidth
                 variant="outlined"
@@ -354,7 +354,14 @@ function Patients() {
                       <TableCell>{patient.gender}</TableCell>
                       <TableCell>{patient.phone}</TableCell>
                       <TableCell align="center">
-                        <Box display="flex" justifyContent="center" alignItems="center" gap={1}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
                           <Button
                             variant="contained"
                             size="small"

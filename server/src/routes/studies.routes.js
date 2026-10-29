@@ -8,16 +8,16 @@ const {
   optionalText,
   id,
   optionalId,
-  optionalDate,
   idParam,
 } = require("../middleware/validate");
 const { asyncHandler, forbidden } = require("../utils/http");
 
 const router = Router();
 
-const createSchema = z.object({
-  patientId: id("Patient ID"),
-  studyId: requiredText("Study ID", 100),
+// Limits and required fields match the Studies table (StudyId is NVARCHAR(50)
+// and StudyId, BodyPart, Modality, StudyDate are NOT NULL in existing databases).
+const studyFields = {
+  studyId: requiredText("Study ID", 50),
   bodyPart: requiredText("Body part", 100),
   modality: requiredText("Modality", 50),
   studyDate: z.coerce.date({
@@ -25,16 +25,15 @@ const createSchema = z.object({
     invalid_type_error: "Study date is not a valid date",
   }),
   studyDescription: optionalText(200),
+};
+
+const createSchema = z.object({
+  patientId: id("Patient ID"),
+  ...studyFields,
   status: optionalText(50),
 });
 
-const updateSchema = z.object({
-  studyId: optionalText(100),
-  bodyPart: optionalText(100),
-  modality: optionalText(50),
-  studyDate: optionalDate,
-  studyDescription: optionalText(200),
-});
+const updateSchema = z.object(studyFields);
 
 const listQuery = z.object({ patientId: optionalId("Patient ID") });
 const params = validate(idParam("Study ID"), "params");

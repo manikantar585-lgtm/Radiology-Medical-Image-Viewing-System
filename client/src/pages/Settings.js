@@ -124,10 +124,10 @@ function Settings() {
             mb: 3,
           }}
         >
-          <Typography variant="h4" fontWeight="bold">
+          <Typography sx={{ fontWeight: "bold" }} variant="h4">
             Settings
           </Typography>
-          <Typography color="text.secondary" mt={1}>
+          <Typography sx={{ color: "text.secondary", mt: 1 }}>
             Manage your application preferences and viewer settings.
           </Typography>
         </Box>
@@ -148,7 +148,7 @@ function Settings() {
               borderRadius: 3,
             }}
           >
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+            <Stack sx={{ alignItems: "center", mb: 2 }} direction="row" spacing={2}>
               <LanguageIcon
                 sx={{
                   fontSize: 34,
@@ -156,10 +156,10 @@ function Settings() {
                 }}
               />
               <Box>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="h6">
                   Language
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ color: "text.secondary" }} variant="body2">
                   Select the application language.
                 </Typography>
               </Box>
@@ -186,7 +186,7 @@ function Settings() {
               borderRadius: 3,
             }}
           >
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+            <Stack sx={{ alignItems: "center", mb: 2 }} direction="row" spacing={2}>
               <PaletteIcon
                 sx={{
                   fontSize: 34,
@@ -194,10 +194,10 @@ function Settings() {
                 }}
               />
               <Box>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="h6">
                   Appearance
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ color: "text.secondary" }} variant="body2">
                   Choose the interface theme.
                 </Typography>
               </Box>
@@ -217,10 +217,10 @@ function Settings() {
               }}
             >
               <Box>
-                <Typography variant="body2" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="body2">
                   Theme
                 </Typography>
-                <Typography variant="body2" color="text.secondary" mt={0.5}>
+                <Typography sx={{ color: "text.secondary", mt: 0.5 }} variant="body2">
                   {currentTheme.label}
                 </Typography>
               </Box>
@@ -254,8 +254,8 @@ function Settings() {
                 }}
               />
               <Box>
-                <Typography fontWeight="bold">{currentTheme.label}</Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography sx={{ fontWeight: "bold" }}>{currentTheme.label}</Typography>
+                <Typography sx={{ color: "text.secondary" }} variant="caption">
                   {currentTheme.description}
                 </Typography>
               </Box>
@@ -277,7 +277,7 @@ function Settings() {
               borderRadius: 3,
             }}
           >
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+            <Stack sx={{ alignItems: "center", mb: 2 }} direction="row" spacing={2}>
               <KeyboardIcon
                 sx={{
                   fontSize: 34,
@@ -285,10 +285,10 @@ function Settings() {
                 }}
               />
               <Box>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="h6">
                   Viewer Hotkeys
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ color: "text.secondary" }} variant="body2">
                   Configure medical image viewer shortcuts.
                 </Typography>
               </Box>
@@ -321,7 +321,7 @@ function Settings() {
               <HotkeyPreview label="Previous Image" value={hotkeys.previousImage} />
               <HotkeyPreview label="Cancel" value={hotkeys.cancel} />
             </Box>
-            <Stack direction="row" spacing={1.5} mt={3}>
+            <Stack sx={{ mt: 3 }} direction="row" spacing={1.5}>
               <Button
                 variant="contained"
                 startIcon={<KeyboardIcon />}
@@ -341,7 +341,7 @@ function Settings() {
               borderRadius: 3,
             }}
           >
-            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+            <Stack sx={{ alignItems: "center", mb: 2 }} direction="row" spacing={2}>
               <SettingsIcon
                 sx={{
                   fontSize: 34,
@@ -349,10 +349,10 @@ function Settings() {
                 }}
               />
               <Box>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="h6">
                   System Information
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ color: "text.secondary" }} variant="body2">
                   Application information.
                 </Typography>
               </Box>
@@ -372,7 +372,7 @@ function Settings() {
               <Typography>
                 <strong>RIS:</strong> Radiology Information System
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography sx={{ color: "text.secondary" }} variant="body2">
                 For project demonstration and educational use.
               </Typography>
             </Stack>
@@ -447,11 +447,11 @@ function Settings() {
                         backgroundColor: theme.color,
                       }}
                     />
-                    <Typography variant="body2" fontWeight="bold">
+                    <Typography sx={{ fontWeight: "bold" }} variant="body2">
                       {theme.label}
                     </Typography>
                   </Box>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography sx={{ color: "text.secondary" }} variant="caption">
                     {theme.description}
                   </Typography>
                 </Box>

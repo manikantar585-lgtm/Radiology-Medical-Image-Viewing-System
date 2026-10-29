@@ -2,6 +2,7 @@ const { Router } = require("express");
 const reportService = require("../services/reportService");
 const patientService = require("../services/patientService");
 const studyService = require("../services/studyService");
+const userService = require("../services/userService");
 const {
   validate,
   z,
@@ -15,9 +16,11 @@ const { asyncHandler, forbidden } = require("../utils/http");
 
 const router = Router();
 
+// Findings and Impression are NOT NULL in existing databases, so blanks are
+// stored as empty text rather than NULL.
 const optionalLongText = z
   .union([z.string(), z.null(), z.undefined()])
-  .transform((value) => (value ? value : null));
+  .transform((value) => value || "");
 
 const reportFields = {
   radiologistName: optionalText(150),
@@ -29,7 +32,9 @@ const reportFields = {
 
 const createSchema = z.object({
   patientId: id("Patient ID"),
-  studyId: optionalId("Study ID"),
+  // Required: every report belongs to a study (the UI enforces it and
+  // Reports.StudyId is NOT NULL in existing databases).
+  studyId: id("Study ID"),
   ...reportFields,
 });
 
@@ -41,6 +46,15 @@ const listQuery = z.object({
 });
 
 const params = validate(idParam("Report ID"), "params");
+
+/** RadiologistName is NOT NULL; default it to the signed-in user's name. */
+async function withRadiologist(userId, report) {
+  if (report.radiologistName) {
+    return report;
+  }
+  const user = await userService.findById(userId);
+  return { ...report, radiologistName: user?.fullName || "Unknown" };
+}
 
 router.get(
   "/",
@@ -60,11 +74,11 @@ router.post(
     if (!(await patientService.isOwnedBy(req.userId, body.patientId))) {
       throw forbidden("Patient not found or access denied");
     }
-    if (body.studyId && !(await studyService.findOwned(req.userId, body.studyId, body.patientId))) {
+    if (!(await studyService.findOwned(req.userId, body.studyId, body.patientId))) {
       throw forbidden("Study not found or access denied");
     }
 
-    const report = await reportService.create(req.userId, body);
+    const report = await reportService.create(req.userId, await withRadiologist(req.userId, body));
     res.status(201).json({ success: true, message: "Report created successfully", report });
   })
 );
@@ -77,7 +91,7 @@ router.put(
     const report = await reportService.update(
       req.userId,
       req.validated.params.id,
-      req.validated.body
+      await withRadiologist(req.userId, req.validated.body)
     );
     res.json({ success: true, message: "Report updated successfully", report });
   })

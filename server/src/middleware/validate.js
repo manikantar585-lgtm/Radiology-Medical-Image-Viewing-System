@@ -41,11 +41,18 @@ const optionalText = (max) =>
     })
     .pipe(z.string().max(max).nullable());
 
+// Missing or blank values report "is required" rather than "must be a number".
 const id = (label) =>
-  z.coerce
-    .number({ invalid_type_error: `${label} must be a number` })
-    .int(`${label} must be a whole number`)
-    .positive(`${label} is required`);
+  z.preprocess(
+    (value) => (value === undefined || value === null || value === "" ? undefined : Number(value)),
+    z
+      .number({
+        required_error: `${label} is required`,
+        invalid_type_error: `${label} must be a number`,
+      })
+      .int(`${label} must be a whole number`)
+      .positive(`${label} is required`)
+  );
 
 const optionalId = (label) =>
   z

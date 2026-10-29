@@ -219,8 +219,8 @@ function Dashboard() {
       >
         <Typography
           variant="h4"
-          fontWeight="bold"
           sx={{
+            fontWeight: "bold",
             fontSize: {
               xs: "1.8rem",
               md: "2.2rem",
@@ -229,12 +229,7 @@ function Dashboard() {
         >
           Welcome Back, {userName}
         </Typography>
-        <Typography
-          mt={1}
-          sx={{
-            maxWidth: "850px",
-          }}
-        >
+        <Typography sx={{ mt: 1, maxWidth: "850px" }}>
           Manage patients, medical studies, reports and diagnostic images from one place.
         </Typography>
       </Paper>
@@ -247,16 +242,16 @@ function Dashboard() {
             alignItems: "center",
           }}
         >
-          <Stack alignItems="center" spacing={2}>
+          <Stack sx={{ alignItems: "center" }} spacing={2}>
             <CircularProgress />
-            <Typography color="text.secondary">Loading dashboard...</Typography>
+            <Typography sx={{ color: "text.secondary" }}>Loading dashboard...</Typography>
           </Stack>
         </Box>
       ) : (
         <>
           <Grid container spacing={2.5}>
             {cards.map((card) => (
-              <Grid item xs={12} sm={6} lg={3} key={card.title}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={card.title}>
                 <Paper
                   elevation={4}
                   onClick={card.action}
@@ -293,13 +288,13 @@ function Dashboard() {
                       textAlign: "center",
                     }}
                   >
-                    <Typography color="text.secondary" fontSize={15}>
+                    <Typography sx={{ color: "text.secondary", fontSize: 15 }}>
                       {card.title}
                     </Typography>
-                    <Typography variant="h3" fontWeight="bold" mt={0.5}>
+                    <Typography sx={{ fontWeight: "bold", mt: 0.5 }} variant="h3">
                       {card.value}
                     </Typography>
-                    <Typography color="primary" mt={0.5} fontSize={14}>
+                    <Typography sx={{ color: "primary", mt: 0.5, fontSize: 14 }}>
                       {card.subtitle}
                     </Typography>
                   </Box>
@@ -328,10 +323,10 @@ function Dashboard() {
               }}
             >
               <Box>
-                <Typography variant="h6" fontWeight="bold">
+                <Typography sx={{ fontWeight: "bold" }} variant="h6">
                   Recent Studies
                 </Typography>
-                <Typography color="text.secondary" variant="body2" mt={0.5}>
+                <Typography sx={{ color: "text.secondary", mt: 0.5 }} variant="body2">
                   Latest medical studies in the system
                 </Typography>
               </Box>
@@ -350,7 +345,7 @@ function Dashboard() {
                   textAlign: "center",
                 }}
               >
-                <Typography color="text.secondary">No studies available.</Typography>
+                <Typography sx={{ color: "text.secondary" }}>No studies available.</Typography>
               </Box>
             ) : (
               <TableContainer>
@@ -382,7 +377,7 @@ function Dashboard() {
                       <TableRow key={study.id} hover>
                         <TableCell>{study.patientName}</TableCell>
                         <TableCell>
-                          <Typography fontWeight="bold">{study.studyId}</Typography>
+                          <Typography sx={{ fontWeight: "bold" }}>{study.studyId}</Typography>
                         </TableCell>
                         <TableCell>{study.modality}</TableCell>
                         <TableCell align="center">
@@ -421,7 +416,7 @@ function Dashboard() {
               mt: 0.5,
             }}
           >
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper
                 elevation={4}
                 sx={{
@@ -432,7 +427,7 @@ function Dashboard() {
                   color: "text.primary",
                 }}
               >
-                <Typography variant="h6" fontWeight="bold" mb={3}>
+                <Typography sx={{ fontWeight: "bold", mb: 3 }} variant="h6">
                   System Summary
                 </Typography>
                 <Stack spacing={2}>
@@ -455,7 +450,7 @@ function Dashboard() {
                 </Stack>
               </Paper>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Paper
                 elevation={4}
                 sx={{
@@ -466,7 +461,7 @@ function Dashboard() {
                   color: "text.primary",
                 }}
               >
-                <Typography variant="h6" fontWeight="bold" mb={3}>
+                <Typography sx={{ fontWeight: "bold", mb: 3 }} variant="h6">
                   Quick Actions
                 </Typography>
                 <Box
@@ -518,8 +513,8 @@ function Dashboard() {
                   </Button>
                 </Box>
                 <Box
-                  mt={4}
                   sx={{
+                    mt: 4,
                     p: 2,
                     borderRadius: 2,
                     backgroundColor: alpha(theme.palette.primary.main, 0.08),
@@ -527,12 +522,10 @@ function Dashboard() {
                     borderColor: alpha(theme.palette.primary.main, 0.2),
                   }}
                 >
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography sx={{ color: "text.secondary" }} variant="body2">
                     Current signed-in user
                   </Typography>
-                  <Typography fontWeight="bold" mt={0.5}>
-                    {userName}
-                  </Typography>
+                  <Typography sx={{ fontWeight: "bold", mt: 0.5 }}>{userName}</Typography>
                 </Box>
               </Paper>
             </Grid>
@@ -547,11 +540,11 @@ function Dashboard() {
               color: "text.primary",
             }}
           >
-            <Typography variant="h6" fontWeight="bold" mb={3}>
+            <Typography sx={{ fontWeight: "bold", mb: 3 }} variant="h6">
               Current System Status
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Box
                   sx={{
                     p: 2.5,
@@ -561,15 +554,15 @@ function Dashboard() {
                     borderColor: alpha(theme.palette.success.main, 0.25),
                   }}
                 >
-                  <Typography color="success.main" fontWeight="bold">
+                  <Typography sx={{ color: "success.main", fontWeight: "bold" }}>
                     Patients Database
                   </Typography>
-                  <Typography variant="body2" mt={0.5} color="text.secondary">
+                  <Typography sx={{ mt: 0.5, color: "text.secondary" }} variant="body2">
                     Connected and available
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Box
                   sx={{
                     p: 2.5,
@@ -580,15 +573,15 @@ function Dashboard() {
                     borderColor: alpha(theme.palette.primary.main, 0.25),
                   }}
                 >
-                  <Typography color="primary.main" fontWeight="bold">
+                  <Typography sx={{ color: "primary.main", fontWeight: "bold" }}>
                     Medical Imaging
                   </Typography>
-                  <Typography variant="body2" mt={0.5} color="text.secondary">
+                  <Typography sx={{ mt: 0.5, color: "text.secondary" }} variant="body2">
                     {totalImages} images stored
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Box
                   sx={{
                     p: 2.5,
@@ -598,10 +591,10 @@ function Dashboard() {
                     borderColor: alpha(theme.palette.warning.main, 0.25),
                   }}
                 >
-                  <Typography color="warning.main" fontWeight="bold">
+                  <Typography sx={{ color: "warning.main", fontWeight: "bold" }}>
                     Reporting
                   </Typography>
-                  <Typography variant="body2" mt={0.5} color="text.secondary">
+                  <Typography sx={{ mt: 0.5, color: "text.secondary" }} variant="body2">
                     {reportCompletion}% reports completed
                   </Typography>
                 </Box>
@@ -623,7 +616,7 @@ function SummaryRow({ label, value }) {
       }}
     >
       <Typography>{label}</Typography>
-      <Typography fontWeight="bold">{value}</Typography>
+      <Typography sx={{ fontWeight: "bold" }}>{value}</Typography>
     </Box>
   );
 }

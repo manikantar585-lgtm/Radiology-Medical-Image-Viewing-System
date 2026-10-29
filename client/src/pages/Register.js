@@ -120,10 +120,10 @@ function Register() {
           borderRadius: 4,
         }}
       >
-        <Typography variant="h4" align="center" fontWeight="bold" mb={1}>
+        <Typography sx={{ fontWeight: "bold", mb: 1 }} variant="h4" align="center">
           Create Account
         </Typography>
-        <Typography align="center" color="text.secondary" mb={3}>
+        <Typography sx={{ color: "text.secondary", mb: 3 }} align="center">
           Radiology Medical Image Viewing System
         </Typography>
         <TextField
@@ -264,7 +264,7 @@ function Register() {
         >
           {loading ? "Creating Account..." : "Create Account"}
         </Button>
-        <Box textAlign="center" mt={3}>
+        <Box sx={{ textAlign: "center", mt: 3 }}>
           Already have an account? <Link to="/">Login</Link>
         </Box>
       </Paper>

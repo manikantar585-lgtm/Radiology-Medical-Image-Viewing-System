@@ -726,11 +726,11 @@ function Reports() {
             mb: 3,
           }}
         >
-          <Typography variant="h5" fontWeight="bold">
+          <Typography sx={{ fontWeight: "bold" }} variant="h5">
             RADIOLOGY MEDICAL REPORT
           </Typography>
 
-          <Typography variant="body2" color="text.secondary" mt={1}>
+          <Typography sx={{ color: "text.secondary", mt: 1 }} variant="body2">
             Radiology Medical Image Viewing System
           </Typography>
         </Box>
@@ -745,7 +745,7 @@ function Reports() {
               PATIENT INFORMATION
           ================================================== */}
 
-        <Typography variant="h6" fontWeight="bold" mb={2}>
+        <Typography sx={{ fontWeight: "bold", mb: 2 }} variant="h6">
           Patient Information
         </Typography>
 
@@ -799,7 +799,7 @@ function Reports() {
               MEDICAL IMAGE
           ================================================== */}
 
-        <Typography variant="h6" fontWeight="bold" mb={2}>
+        <Typography sx={{ fontWeight: "bold", mb: 2 }} variant="h6">
           Medical Image
         </Typography>
 
@@ -900,7 +900,7 @@ function Reports() {
               FINDINGS
           ================================================== */}
 
-        <Typography variant="h6" fontWeight="bold" mb={2}>
+        <Typography sx={{ fontWeight: "bold", mb: 2 }} variant="h6">
           Clinical Findings
         </Typography>
 
@@ -927,7 +927,7 @@ function Reports() {
               IMPRESSION
           ================================================== */}
 
-        <Typography variant="h6" fontWeight="bold" mb={2}>
+        <Typography sx={{ fontWeight: "bold", mb: 2 }} variant="h6">
           Final Impression
         </Typography>
 
@@ -941,12 +941,7 @@ function Reports() {
             backgroundColor: "#fafafa",
           }}
         >
-          <Typography
-            fontWeight="bold"
-            sx={{
-              whiteSpace: "pre-wrap",
-            }}
-          >
+          <Typography sx={{ fontWeight: "bold", whiteSpace: "pre-wrap" }}>
             {selectedReport.impression || "No impression provided."}
           </Typography>
         </Paper>
@@ -1021,17 +1016,11 @@ function Reports() {
           }}
         >
           <Box>
-            <Typography variant="h4" fontWeight="bold">
+            <Typography sx={{ fontWeight: "bold" }} variant="h4">
               Radiology Reports
             </Typography>
 
-            <Typography
-              color="text.secondary"
-              variant="body2"
-              sx={{
-                mt: 0.7,
-              }}
-            >
+            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.7 }}>
               Create, review and manage diagnostic reports
             </Typography>
           </Box>
@@ -1132,7 +1121,7 @@ function Reports() {
               borderColor: "divider",
             }}
           >
-            <Typography variant="h6" fontWeight="bold">
+            <Typography sx={{ fontWeight: "bold" }} variant="h6">
               Reports
             </Typography>
 
@@ -1156,9 +1145,7 @@ function Reports() {
             >
               <CircularProgress />
 
-              <Typography color="text.secondary" mt={2}>
-                Loading reports...
-              </Typography>
+              <Typography sx={{ color: "text.secondary", mt: 2 }}>Loading reports...</Typography>
             </Box>
           ) : filteredReports.length === 0 ? (
             <Box
@@ -1180,7 +1167,7 @@ function Reports() {
 
               <Typography variant="h6">No reports found</Typography>
 
-              <Typography color="text.secondary" mt={1}>
+              <Typography sx={{ color: "text.secondary", mt: 1 }}>
                 Create a report to see it here.
               </Typography>
             </Box>
@@ -1228,11 +1215,11 @@ function Reports() {
                         {/* PATIENT */}
 
                         <TableCell>
-                          <Typography fontWeight="600">
+                          <Typography sx={{ fontWeight: "600" }}>
                             {report.patientName || "Unknown Patient"}
                           </Typography>
 
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography sx={{ color: "text.secondary" }} variant="caption">
                             ID: {report.patientId || "-"}
                           </Typography>
                         </TableCell>
@@ -1240,11 +1227,11 @@ function Reports() {
                         {/* STUDY */}
 
                         <TableCell>
-                          <Typography fontWeight="500">
+                          <Typography sx={{ fontWeight: "500" }}>
                             {report.studyNumber || report.studyId || "-"}
                           </Typography>
 
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography sx={{ color: "text.secondary" }} variant="caption">
                             {report.modality || getStudyForReport(report)?.modality || "-"}
                           </Typography>
                         </TableCell>
@@ -1368,7 +1355,7 @@ function Reports() {
                     backgroundColor: "#f7f9fc",
                   }}
                 >
-                  <Typography variant="subtitle1" fontWeight="bold" mb={1}>
+                  <Typography sx={{ fontWeight: "bold", mb: 1 }} variant="subtitle1">
                     Selected Study
                   </Typography>
 
@@ -1507,12 +1494,12 @@ function Reports() {
             }}
           >
             <Box>
-              <Typography variant="h6" fontWeight="bold">
+              <Typography sx={{ fontWeight: "bold" }} variant="h6">
                 Report Preview
               </Typography>
 
               {selectedReport && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ color: "text.secondary" }} variant="body2">
                   Patient:{" "}
                   {selectedReport.patientName ||
                     getStudyForReport(selectedReport)?.patientName ||

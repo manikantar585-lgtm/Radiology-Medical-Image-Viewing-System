@@ -4,11 +4,13 @@ jest.mock("../src/services/patientService");
 jest.mock("../src/services/studyService");
 jest.mock("../src/services/seriesService");
 jest.mock("../src/services/reportService");
+jest.mock("../src/services/userService");
 
 const patientService = require("../src/services/patientService");
 const studyService = require("../src/services/studyService");
 const seriesService = require("../src/services/seriesService");
 const reportService = require("../src/services/reportService");
+const userService = require("../src/services/userService");
 const { signToken } = require("../src/middleware/auth");
 const { createApp } = require("../src/app");
 const { notFound } = require("../src/utils/http");
@@ -147,6 +149,35 @@ describe("series upload", () => {
 });
 
 describe("reports", () => {
+  it("fills NOT NULL columns: radiologist defaults to the user, blanks become empty text", async () => {
+    patientService.isOwnedBy.mockResolvedValue(true);
+    studyService.findOwned.mockResolvedValue({ id: 2 });
+    userService.findById.mockResolvedValue({ id: 3, fullName: "Dr Test" });
+    reportService.create.mockResolvedValue({ id: 1 });
+
+    const res = await request(app)
+      .post("/api/reports")
+      .set(auth)
+      .send({ patientId: 1, studyId: 2 });
+
+    expect(res.status).toBe(201);
+    expect(reportService.create).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ radiologistName: "Dr Test", findings: "", impression: "" })
+    );
+  });
+
+  it("requires a study", async () => {
+    const res = await request(app)
+      .post("/api/reports")
+      .set(auth)
+      .send({ patientId: 1, findings: "Normal" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Study ID is required");
+    expect(reportService.create).not.toHaveBeenCalled();
+  });
+
   it("refuses a study that does not belong to the patient", async () => {
     patientService.isOwnedBy.mockResolvedValue(true);
     studyService.findOwned.mockResolvedValue(null);
