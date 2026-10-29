@@ -19,6 +19,9 @@ function Layout({ children }) {
         component="main"
         sx={{
           flexGrow: 1,
+          // Without this, a flex item cannot shrink below its content's width,
+          // so wide content (the viewer canvas) pushes the page past the window.
+          minWidth: 0,
           p: 3,
           backgroundColor: "background.default",
           color: "text.primary",
