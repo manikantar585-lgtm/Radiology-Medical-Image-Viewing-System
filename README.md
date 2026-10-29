@@ -59,7 +59,7 @@ flowchart LR
 | Layer | Tech |
 |---|---|
 | Frontend | React 19, Material UI, Cornerstone3D (`core`, `tools`, `dicom-image-loader`), CRACO |
-| API | Node.js 20, Express 5, `mssql`, `zod`, `jsonwebtoken`, `helmet`, `multer` |
+| API | Node.js 24, Express 5, `mssql`, `zod`, `jsonwebtoken`, `helmet`, `multer` |
 | AI service | Python 3.13, FastAPI, PyTorch, pydicom, open_clip, torchxrayvision, TotalSegmentator |
 | Database | Microsoft SQL Server |
 | Tooling | Jest + Supertest, React Testing Library, pytest, ESLint, Prettier, Ruff, GitHub Actions, Docker Compose |
@@ -97,7 +97,7 @@ Open <http://localhost:3000>. SQL Server, the API, the AI service and the web cl
 
 ### Option B: Run each service locally
 
-**Prerequisites:** Node.js 20+, Python 3.13, and Microsoft SQL Server with a `RadiologyDB` database. Tables are created on first start. Set `DB_CREATE_IF_MISSING=true` to have the API create the database too.
+**Prerequisites:** Node.js 24, Python 3.13, and Microsoft SQL Server with a `RadiologyDB` database. Tables are created on first start. Set `DB_CREATE_IF_MISSING=true` to have the API create the database too.
 
 **1. API**
 ```bash
